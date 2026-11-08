@@ -1,0 +1,1 @@
+window.CFG = { url: "https://veftmxsqgbbhtrakmvbz.supabase.co", key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlZnRteHNxZ2JiaHRyYWttdmJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI3MjksImV4cCI6MjEwOTcyODcyOX0.2wqBN7QFbjGBIP1nfNGElA0hrBvrJeFZiqx0zvjhcVM" };
