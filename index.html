@@ -1,0 +1,214 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Household">
+<meta name="theme-color" content="#12302e"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png"><link rel="apple-touch-startup-image" media="(device-width:390px) and (device-height:844px) and (-webkit-device-pixel-ratio:3)" href="splash-1170x2532.png"><link rel="apple-touch-startup-image" media="(device-width:393px) and (device-height:852px) and (-webkit-device-pixel-ratio:3)" href="splash-1179x2556.png"><link rel="apple-touch-startup-image" media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3)" href="splash-1290x2796.png">
+<title>Household Tracker</title>
+<style>
+:root{--ink:#12302e;--bg:#f1f5f4;--card:#fff;--tx:#14201f;--mut:#667472;--acc:#f2a93b;--bad:#c8412b;--ok:#1f8a63;--ln:#dde5e3}
+@media(prefers-color-scheme:dark){:root{--bg:#0c1615;--card:#14231f;--tx:#e8f0ee;--mut:#8da39f;--ln:#243532}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}main{max-width:520px;margin:0 auto;padding:12px 14px 40px}
+.hero{background:var(--ink);color:#fff;border-radius:22px;padding:18px 18px 16px;margin-top:6px}
+.hero small{opacity:.7}.bal{font-size:40px;font-weight:700;letter-spacing:-.02em}.row{display:flex;gap:10px}.row>div{flex:1}.row b{display:block;font-size:17px}
+.bar{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut);padding:6px 4px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-inline-end:6px}.off .dot{background:var(--bad)}.sync .dot{background:var(--acc)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
+button{font:inherit;color:inherit;border:0;cursor:pointer}.tile{background:var(--card);border:1px solid var(--ln);border-radius:18px;min-height:76px;padding:12px;text-align:start;font-weight:600}
+.tile span{display:block;font-weight:400;color:var(--mut);font-size:14px}.tile.big{background:var(--acc);color:#2a1d00;border:0}.tile.inc{border-color:var(--ok)}
+h2{font-size:15px;margin:20px 4px 8px;color:var(--mut);font-weight:600}
+.tx{display:flex;justify-content:space-between;gap:8px;background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:6px;border:1px solid var(--ln)}
+.tx small{color:var(--mut)}.amt{font-weight:700;white-space:nowrap}.neg{color:var(--bad)}.pos{color:var(--ok)}.x{background:none;color:var(--mut);font-size:20px;padding:0 4px}
+input{width:100%;font:inherit;padding:14px;border-radius:14px;border:1px solid var(--ln);background:var(--card);color:var(--tx);margin:6px 0}
+.btn{width:100%;padding:15px;border-radius:14px;background:var(--ink);color:#fff;font-weight:700;margin-top:8px}.btn.alt{background:none;color:var(--mut);font-weight:500}
+.sheet{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;z-index:9}.sheet.on{display:flex}
+.sheet>div{background:var(--bg);width:100%;max-width:520px;margin:0 auto;border-radius:24px 24px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom))}
+#amt{font-size:34px;font-weight:700;text-align:center}.link{background:none;color:var(--mut);text-decoration:underline;font-size:13px}.auth{padding-top:8vh}.auth h1{font-size:30px;margin:0 0 4px}.err{color:var(--bad);min-height:20px}
+
+#nv{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+#nv button{flex:1;padding:14px 0;background:none;color:var(--mut);font-weight:600}#nv button.on{color:var(--tx);box-shadow:inset 0 3px var(--acc)}main{padding-bottom:90px}
+select{width:100%;font:inherit;padding:14px;border-radius:14px;border:1px solid var(--ln);background:var(--card);color:var(--tx);margin:6px 0}
+.chips{display:flex;gap:8px;margin:6px 0}.chips button{flex:1;padding:11px 0;border-radius:12px;background:var(--card);border:1px solid var(--ln)}.chips button.on{background:var(--ink);color:#fff}
+.bi{margin:10px 0}.bl{display:flex;justify-content:space-between;font-size:14px}.bt{height:9px;border-radius:5px;background:var(--ln);margin-top:4px}.bt i{display:block;height:100%;border-radius:5px;background:var(--acc)}
+.kp{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kp div{background:var(--card);border:1px solid var(--ln);border-radius:16px;padding:12px}.kp small{color:var(--mut)}.kp b{display:block;font-size:20px}
+.dc{display:flex;align-items:flex-end;gap:3px;height:90px;margin:10px 0}.dc i{flex:1;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}.dn{display:flex;justify-content:space-between;align-items:center}.dn button{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:10px 16px}
+</style></head><body><main id="app"></main>
+<div class="sheet" id="sh"><div><b id="st"></b><input id="amt" inputmode="decimal" placeholder="0"><select id="wl"></select><select id="wl2"></select><input id="nt" placeholder="Note (optional)"><button class="btn" id="sv">Save</button><button class="btn alt" onclick="sh.classList.remove('on')">Cancel</button></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const LG=localStorage.getItem('ht_lang')||'en';const $=s=>document.querySelector(s),app=$('#app'),sh=$('#sh');
+const sb=supabase.createClient(CFG.url,CFG.key);
+const fmt=n=>new Intl.NumberFormat(LG==='ar'?'ar-EG':'en-EG',{style:'currency',currency:'EGP',maximumFractionDigits:2}).format(n||0);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let wallets=[],hh=null,items=[],txs=[],sum={},edit=false,ch=null,status='';
+const Q=()=>JSON.parse(localStorage.getItem('ht_q')||'[]'),setQ=q=>localStorage.setItem('ht_q',JSON.stringify(q));
+
+sb.auth.onAuthStateChange((e,s)=>{ if(e==='PASSWORD_RECOVERY'){const p=prompt('New password (min 6 characters)');if(p)sb.auth.updateUser({password:p}).then(({error})=>alert(error?error.message:'Password updated'))} });
+async function boot(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)return authView();
+  const {data}=await sb.from('members').select('households(id,name,invite_code)').limit(1);
+  if(data&&data[0]){hh=data[0].households;localStorage.setItem('ht_hh',JSON.stringify(hh))}
+  else if(!navigator.onLine&&localStorage.getItem('ht_hh'))hh=JSON.parse(localStorage.getItem('ht_hh'));
+  hh?dashView():setupView();
+}
+function authView(msg=''){
+  app.innerHTML=`<div class="auth"><button class="link" onclick="setLang()">العربية / EN</button><h1>Household Tracker</h1><p style="color:var(--mut)">Every purchase, one tap.</p>
+  <input id="nm" placeholder="Your name (new accounts)"><input id="em" type="email" placeholder="Email" autocomplete="username"><input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+  <div class="err" id="er">${esc(msg)}</div><button class="btn" id="li">Log in</button><button class="btn alt" id="su">Create account</button><button class="link" id="fp">Forgot password?</button></div>`;
+  const v=()=>({email:$('#em').value.trim(),password:$('#pw').value}),fail=e=>$('#er').textContent=e.message;
+  $('#li').onclick=async()=>{const{error}=await sb.auth.signInWithPassword(v());error?fail(error):boot()};
+  $('#su').onclick=async()=>{const{data,error}=await sb.auth.signUp({...v(),options:{data:{name:$('#nm').value.trim()}}});error?fail(error):data.session?boot():$('#er').textContent='Check your email to confirm, then log in.'};
+  $('#fp').onclick=async()=>{const{error}=await sb.auth.resetPasswordForEmail($('#em').value.trim(),{redirectTo:location.origin+location.pathname});$('#er').textContent=error?error.message:'Reset link sent to your email.'};
+}
+function setupView(){
+  app.innerHTML=`<div class="auth"><h1>Your household</h1><p style="color:var(--mut)">Start a new one, or join with a code.</p>
+  <input id="hn" placeholder="Household name"><button class="btn" id="cr">Create household</button>
+  <input id="cd" placeholder="Invitation code" style="margin-top:22px"><button class="btn" id="jn">Join household</button><div class="err" id="er"></div><button class="link" onclick="sb.auth.signOut().then(boot)">Log out</button></div>`;
+  const go=async(fn,a)=>{const{error}=await sb.rpc(fn,a);error?$('#er').textContent=error.message:boot()};
+  $('#cr').onclick=()=>go('create_household',{hname:$('#hn').value.trim()||'Home'});
+  $('#jn').onclick=()=>go('join_household',{code:$('#cd').value});
+}
+async function dashView(){
+  app.innerHTML=`<nav id="nv"><button data-n="home" class="on">Home</button><button data-n="daily">Daily</button><button data-n="stats">Stats</button><button data-n="hist">History</button></nav><div id="home"><div class="bar"><span id="net"><i class="dot"></i><span id="ns"></span></span><span><button class="link" id="inv">Invite code: ${esc(hh.invite_code)}</button> · <button class="link" id="lo">Log out</button> · <button class="link" onclick="setLang()">العربية / EN</button></span></div>
+  <div class="hero"><small>Total balance</small><div class="bal" id="bal">…</div><div class="row"><div><small>Today</small><b id="s1"></b></div><div><small>This week</small><b id="s2"></b></div><div><small>This month</small><b id="s3"></b></div></div></div>
+  <div class="kp" id="wb" style="margin-top:12px"></div><div class="grid"><button class="tile big" data-t="withdraw">Withdraw cash<span>Bank → household cash</span></button><button class="tile inc" data-t="income">Add income</button></div>
+  <h2>Quick purchases ${''}<button class="link" id="ed"></button></h2><div class="grid" id="qi"></div>
+  <div class="grid"><button class="tile" data-t="expense">Custom expense</button><button class="tile" data-t="deposit">Cash back to bank</button><button class="tile" data-t="transfer">Transfer</button></div>
+  <h2>Recent</h2><div id="tl"></div></div><div id="more" hidden></div>`;
+  $('#lo').onclick=()=>sb.auth.signOut().then(()=>{hh=null;boot()});
+  $('#inv').onclick=()=>{const t=`Join our household in Household Tracker with code: ${hh.invite_code}\n${location.origin+location.pathname}`;navigator.share?navigator.share({text:t}):prompt('Send this to your family:',t)};
+  $('#ed').onclick=()=>{edit=!edit;paint()};document.querySelectorAll('#nv button').forEach(b=>b.onclick=()=>tab(b.dataset.n));
+  document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>openSheet(b.dataset.t));
+  addEventListener('online',flush);addEventListener('offline',netPaint);
+  if(ch)sb.removeChannel(ch);
+  ch=sb.channel('tx').on('postgres_changes',{event:'*',schema:'public',table:'transactions',filter:`household_id=eq.${hh.id}`},load).subscribe();
+  await load();flush();
+}
+function netPaint(){const n=$('#net');if(!n)return;const q=Q().length;const s=!navigator.onLine?'off':q?'sync':'';n.className=s;$('#ns').textContent=s==='off'?`Offline${q?` · ${q} waiting`:''}`:q?`Syncing ${q}…`:'Online'}
+async function load(){
+  if(navigator.onLine){
+    const [a,b,c,d]=await Promise.all([sb.rpc('household_summary',{h:hh.id}),sb.from('quick_items').select('*').eq('household_id',hh.id).order('name'),
+      sb.from('transactions').select('*,profiles(name)').eq('household_id',hh.id).order('created_at',{ascending:false}).limit(40),sb.rpc('wallet_balances',{h:hh.id})]);
+    if(a.data){sum=a.data;items=b.data||[];txs=c.data||[];wallets=d.data||[];localStorage.setItem('ht_c',JSON.stringify({sum,items,txs,wallets}))}
+  }else{const c=JSON.parse(localStorage.getItem('ht_c')||'null');if(c)({sum,items,txs,wallets}=c)}
+  paint();
+}
+function paint(){
+  if(!$('#bal'))return;
+  const pend=Q().filter(r=>!r.op&&r.household_id===hh.id),sg=t=>t==='income'||t==='withdraw'?1:t==='transfer'?0:-1;
+  const pb=pend.reduce((s,r)=>s+sg(r.type)*r.amount,0),pe=pend.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+  $('#bal').textContent=fmt((sum.balance||0)+pb);$('#s1').textContent=fmt((sum.today||0)+pe);$('#s2').textContent=fmt((sum.week||0)+pe);$('#s3').textContent=fmt((sum.month||0)+pe);
+  $('#ed').textContent=edit?'Done':'Edit prices';$('#wb').innerHTML=wallets.map(w=>`<div><small>${esc(w.name)}</small><b>${fmt(w.balance)}</b></div>`).join('');
+  $('#qi').innerHTML=items.map(i=>`<button class="tile" data-i="${i.id}">${esc(i.name)}<span>${fmt(i.default_price)}</span></button>`).join('');
+  document.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const it=items.find(x=>x.id===b.dataset.i);
+    if(edit){const p=prompt(`Default price for ${it.name}`,it.default_price);if(p!==null&&+p>=0)sb.from('quick_items').update({default_price:+p}).eq('id',it.id).then(load)}
+    else openSheet('expense',it.name,it.default_price)});
+  const mine=pend.map(r=>({...r,id:r.client_id,pending:1,profiles:{name:'You'}}));
+  $('#tl').innerHTML=[...mine,...txs].map(t=>`<div class="tx"><div><b>${esc(t.category||t.type)}</b><br><small>${esc(t.profiles?.name||'')} · ${new Date(t.created_at).toLocaleString((LG==='ar'?'ar-EG':'en-GB'),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${t.pending?' · waiting to sync':''}${t.note?' · '+esc(t.note):''}</small></div>
+    <div><span class="amt ${sg(t.type)>0?'pos':sg(t.type)?'neg':''}" ${t.pending?'':`data-e="${t.id}"`}>${sg(t.type)>0?'+':sg(t.type)?'−':'⇄ '}${fmt(t.amount)}</span>${t.pending?'':`<button class="x" data-d="${t.id}">×</button>`}</div></div>`).join('')||'<p style="color:var(--mut)">No transactions yet. Withdraw cash to start.</p>';
+  document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>confirm(T('Delete this transaction?'))&&queueOp({op:'del',id:b.dataset.d}));
+  document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const x=txs.find(y=>y.id===b.dataset.e),p=prompt(T('New amount'),x.amount);if(p&&+p>0)queueOp({op:'upd',id:x.id,amount:+p,base:x.updated_at})});
+  netPaint();
+}
+const LBL={transfer:'Transfer',withdraw:'Withdraw cash',income:'Add income',expense:'Expense',deposit:'Cash back to bank'};
+function openSheet(type,cat='',price=''){
+  $('#st').textContent=cat||LBL[type];$('#amt').value=price;$('#nt').value='';sh.classList.add('on');
+  $('#wl').innerHTML=wallets.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');$('#wl2').innerHTML=wallets.map(w=>`<option value="${w.id}">→ ${esc(w.name)}</option>`).join('');$('#wl').hidden=!wallets.length;$('#wl2').hidden=type!=='transfer';if(wallets[1])$('#wl2').value=wallets[1].id;
+  $('#nt').placeholder=type==='expense'&&!cat?'What was it?':'Note (optional)';
+  setTimeout(()=>{$('#amt').focus();$('#amt').select()},60);
+  $('#sv').onclick=()=>{const a=+String($('#amt').value).replace(',','.');if(!(a>0))return $('#amt').focus();
+    const note=$('#nt').value.trim(),c=cat||(type==='expense'?note||'Expense':LBL[type]);
+    const w1=$('#wl').value||null,w2=type==='transfer'?$('#wl2').value:null;if(w2&&w1===w2)return alert(T('Choose two different wallets'));
+    setQ([...Q(),{client_id:crypto.randomUUID(),household_id:hh.id,wallet_id:w1,to_wallet_id:w2,type,amount:a,category:c,note:cat?note:'',created_at:new Date().toISOString()}]);
+    sh.classList.remove('on');paint();flush()};
+}
+function queueOp(o){o.household_id=hh.id;setQ([...Q(),o]);txs=o.op==='del'?txs.filter(x=>x.id!==o.id):txs.map(x=>x.id===o.id?{...x,amount:o.amount}:x);localStorage.setItem('ht_c',JSON.stringify({sum,items,txs,wallets}));paint();flush()}
+let busy=false;
+async function flush(){
+  if(busy||!navigator.onLine||!Q().length)return netPaint();busy=true;
+  for(const r of Q()){
+    let error;
+    if(r.op==='del')({error}=await sb.from('transactions').delete().eq('id',r.id));
+    else if(r.op==='upd'){const x=await sb.from('transactions').update({amount:r.amount}).eq('id',r.id).eq('updated_at',r.base).select('id');error=x.error;if(!error&&!x.data.length)alert(T('Changed on another device. Your edit was skipped.'))}
+    else({error}=await sb.from('transactions').upsert(r,{onConflict:'client_id',ignoreDuplicates:true}));
+    if(error&&/network|fetch/i.test(error.message))break;
+    if(error)console.error(error);
+    setQ(Q().filter(x=>x!==r&&!(x.client_id&&x.client_id===r.client_id)&&!(x.op&&x.id===r.id&&x.op===r.op&&x.amount===r.amount)));
+  }
+  busy=false;await load();
+}
+
+/* ---- Batch 1: Daily summary, Stats, History ---- */
+const day=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const need=()=>'<p style="color:var(--mut)">This screen needs an internet connection.</p>';
+const bars=r=>{const m=Math.max(...r.map(x=>+x.total),1);return r.map(x=>`<div class="bi"><div class="bl"><span>${esc(x.name)} · ${x.n}×</span><b>${fmt(x.total)}</b></div><div class="bt"><i style="width:${x.total/m*100}%"></i></div></div>`).join('')||'<p style="color:var(--mut)">Nothing yet.</p>'};
+const trow=t=>`<div class="tx"><div><b>${esc(t.category||t.type)}</b><br><small>${esc(t.profiles?.name||t.pname||'')} · ${new Date(t.created_at).toLocaleString((LG==='ar'?'ar-EG':'en-GB'),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${t.note?' · '+esc(t.note):''}</small></div><span class="amt ${t.type==='income'||t.type==='withdraw'?'pos':t.type==='transfer'?'':'neg'}">${t.type==='income'||t.type==='withdraw'?'+':t.type==='transfer'?'⇄ ':'−'}${fmt(t.amount)}</span></div>`;
+function tab(n){document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.n===n));$('#home').hidden=n!=='home';$('#more').hidden=n==='home';if(n!=='home')({daily:dailyView,stats:statsView,hist:histView})[n]();scrollTo(0,0)}
+
+let dd=day(new Date());
+async function dailyView(){
+  const v=$('#more');if(!navigator.onLine)return v.innerHTML=need();
+  const a=new Date(dd+'T00:00:00'),b=new Date(a.getTime()+864e5);
+  const [r,l]=await Promise.all([sb.rpc('range_stats',{h:hh.id,d1:dd,d2:dd}),sb.from('transactions').select('*,profiles(name)').eq('household_id',hh.id).eq('type','expense').gte('created_at',a.toISOString()).lt('created_at',b.toISOString()).order('created_at',{ascending:false})]);
+  const s=r.data||{by_member:[],top:[]},top=s.top[0];
+  v.innerHTML=`<div class="dn"><button id="pv">‹</button><input id="dp" type="date" value="${dd}" style="width:auto"><button id="nx">›</button></div>
+  <div class="hero" style="margin:12px 0"><small>Household spending</small><div class="bal">${fmt(s.expenses)}</div><small>${s.count||0} purchases${top?` · biggest: ${esc(top.category)} ${fmt(top.amount)}`:''}</small></div>
+  <h2>By person</h2>${bars(s.by_member)}<h2>Purchases</h2>${(l.data||[]).map(trow).join('')||'<p style="color:var(--mut)">No purchases on this day.</p>'}`;
+  const go=x=>{dd=x;dailyView()};
+  $('#pv').onclick=()=>go(day(new Date(a.getTime()-864e5)));$('#nx').onclick=()=>go(day(b));$('#dp').onchange=e=>e.target.value&&go(e.target.value);
+}
+
+let sr='month',cf=day(new Date()),ct=cf;
+async function statsView(){
+  const v=$('#more');if(!navigator.onLine)return v.innerHTML=need();
+  const t=new Date(),d=day(t);let a=d,b=d;
+  if(sr==='week'){const x=new Date(t);x.setDate(t.getDate()-((t.getDay()+6)%7));a=day(x)}
+  if(sr==='month')a=d.slice(0,8)+'01';
+  if(sr==='custom'){a=cf;b=ct}
+  const {data:s}=await sb.rpc('range_stats',{h:hh.id,d1:a,d2:b});if(!s)return;
+  const mx=Math.max(...s.daily.map(x=>+x.total),1),freq=[...s.by_cat].sort((x,y)=>y.n-x.n).slice(0,5).map(x=>({...x,total:x.n}));
+  v.innerHTML=`<div class="chips">${['today','week','month','custom'].map(r=>`<button data-r="${r}" class="${sr===r?'on':''}">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>
+  ${sr==='custom'?`<div class="row"><input id="c1" type="date" value="${cf}"><input id="c2" type="date" value="${ct}"></div>`:''}
+  <div class="kp"><div><small>Spent</small><b class="neg">${fmt(s.expenses)}</b></div><div><small>Income</small><b class="pos">${fmt(s.income)}</b></div></div>
+  <h2>Spending per day</h2><div class="dc">${s.daily.map(x=>`<i title="${x.d}" style="height:${x.total/mx*100}%"></i>`).join('')||'<small>No spending in this range.</small>'}</div>
+  <h2>By category</h2>${bars(s.by_cat)}<h2>By person</h2>${bars(s.by_member)}
+  <h2>Most bought</h2>${freq.map(x=>`<div class="bl"><span>${esc(x.name)}</span><b>${x.n}×</b></div>`).join('')||'<small>Nothing yet.</small>'}
+  <h2>Biggest purchases</h2>${s.top.map(x=>`<div class="tx"><div><b>${esc(x.category)}</b><br><small>${esc(x.pname)} · ${new Date(x.created_at).toLocaleDateString((LG==='ar'?'ar-EG':'en-GB'))}</small></div><span class="amt neg">${fmt(x.amount)}</span></div>`).join('')||'<small>Nothing yet.</small>'}`;
+  document.querySelectorAll('[data-r]').forEach(x=>x.onclick=()=>{sr=x.dataset.r;statsView()});
+  if(sr==='custom'){$('#c1').onchange=e=>{cf=e.target.value||cf;statsView()};$('#c2').onchange=e=>{ct=e.target.value||ct;statsView()}}
+}
+
+const F={q:'',a:'',b:'',c:'',m:'',s:'created_at.desc'};
+async function histView(){
+  const v=$('#more');if(!navigator.onLine)return v.innerHTML=need();
+  const {data:mem}=await sb.from('members').select('user_id,profiles(name)').eq('household_id',hh.id);
+  const S=[['created_at.desc','Newest first'],['created_at.asc','Oldest first'],['amount.desc','Highest amount'],['amount.asc','Lowest amount']];
+  v.innerHTML=`<input id="fq" placeholder="Search" value="${esc(F.q)}"><div class="row"><input id="fa" type="date" value="${F.a}"><input id="fb" type="date" value="${F.b}"></div>
+  <select id="fc"><option value="">All categories</option>${items.map(i=>`<option value="${esc(i.name)}" ${F.c===i.name?'selected':''}>${esc(i.name)}</option>`).join('')}</select>
+  <select id="fm"><option value="">Everyone</option>${(mem||[]).map(m=>`<option value="${m.user_id}" ${F.m===m.user_id?'selected':''}>${esc(m.profiles?.name)}</option>`).join('')}</select>
+  <select id="fs">${S.map(o=>`<option value="${o[0]}" ${F.s===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select><div id="hl" style="margin-top:10px"></div>`;
+  const run=async()=>{
+    let q=sb.from('transactions').select('*,profiles(name)').eq('household_id',hh.id);
+    const t=F.q.replace(/[,()%*]/g,'');if(t)q=q.or(`category.ilike.%${t}%,note.ilike.%${t}%`);
+    if(F.a)q=q.gte('created_at',new Date(F.a+'T00:00:00').toISOString());if(F.b)q=q.lte('created_at',new Date(F.b+'T23:59:59').toISOString());
+    if(F.c)q=q.eq('category',F.c);if(F.m)q=q.eq('user_id',F.m);
+    const [col,dir]=F.s.split('.');const {data}=await q.order(col,{ascending:dir==='asc'}).limit(100);
+    $('#hl').innerHTML=(data||[]).map(trow).join('')||'<p style="color:var(--mut)">No matching transactions.</p>';
+  };
+  [['fq','q'],['fa','a'],['fb','b'],['fc','c'],['fm','m'],['fs','s']].forEach(([id,k])=>$('#'+id).oninput=e=>{F[k]=e.target.value;run()});
+  run();
+}
+
+
+const AR={"Household Tracker": "متتبع المنزل", "Every purchase, one tap.": "كل مشترياتك بنقرة واحدة.", "Your name (new accounts)": "اسمك (للحسابات الجديدة)", "Email": "البريد الإلكتروني", "Password": "كلمة المرور", "Log in": "تسجيل الدخول", "Create account": "إنشاء حساب", "Forgot password?": "نسيت كلمة المرور؟", "Check your email to confirm, then log in.": "تحقق من بريدك للتأكيد ثم سجل الدخول.", "Reset link sent to your email.": "أُرسل رابط الاستعادة إلى بريدك.", "Your household": "أسرتك", "Start a new one, or join with a code.": "أنشئ أسرة جديدة أو انضم برمز.", "Household name": "اسم الأسرة", "Create household": "إنشاء أسرة", "Invitation code": "رمز الدعوة", "Join household": "الانضمام للأسرة", "Log out": "تسجيل الخروج", "Invite code:": "رمز الدعوة:", "Online": "متصل", "Offline": "غير متصل", "waiting to sync": "بانتظار المزامنة", "waiting": "بالانتظار", "Syncing": "مزامنة", "Total balance": "الرصيد الإجمالي", "Today": "اليوم", "This week": "هذا الأسبوع", "This month": "هذا الشهر", "Withdraw cash": "سحب نقدي", "Bank → household cash": "من البنك إلى النقدية", "Add income": "إضافة دخل", "Quick purchases": "مشتريات سريعة", "Edit prices": "تعديل الأسعار", "Done": "تم", "Custom expense": "مصروف آخر", "Cash back to bank": "إيداع في البنك", "Recent": "الأخيرة", "Transfer": "تحويل", "Home": "الرئيسية", "Daily": "اليومي", "Stats": "الإحصاءات", "History": "السجل", "Save": "حفظ", "Cancel": "إلغاء", "Note (optional)": "ملاحظة (اختياري)", "What was it?": "ما هو؟", "Expense": "مصروف", "Bread": "عيش", "Fish": "سمك", "Chicken": "فراخ", "Meat": "لحمة", "Rice": "أرز", "Vegetables": "خضار", "Fruits": "فاكهة", "Milk": "لبن", "Eggs": "بيض", "Other groceries": "بقالة أخرى", "Household cash": "نقدية المنزل", "Bank account": "حساب بنكي", "Personal cash": "نقدية شخصية", "Spent": "المصروف", "Income": "الدخل", "Search": "بحث", "All categories": "كل الفئات", "Everyone": "الجميع", "Newest first": "الأحدث أولاً", "Oldest first": "الأقدم أولاً", "Highest amount": "الأعلى مبلغاً", "Lowest amount": "الأقل مبلغاً", "Week": "أسبوع", "Month": "شهر", "Custom": "مخصص", "Spending per day": "الصرف اليومي", "By category": "حسب الفئة", "By person": "حسب الشخص", "Most bought": "الأكثر شراءً", "Biggest purchases": "أكبر المشتريات", "Purchases": "المشتريات", "Household spending": "مصروف الأسرة", "Nothing yet.": "لا شيء بعد.", "No transactions yet. Withdraw cash to start.": "لا توجد معاملات بعد. اسحب نقداً للبدء.", "No matching transactions.": "لا توجد نتائج.", "No purchases on this day.": "لا مشتريات في هذا اليوم.", "You": "أنت", "This screen needs an internet connection.": "هذه الشاشة تحتاج إلى إنترنت.", "Delete this transaction?": "حذف هذه المعاملة؟", "New amount": "المبلغ الجديد", "Choose two different wallets": "اختر محفظتين مختلفتين", "Changed on another device. Your edit was skipped.": "تم التعديل من جهاز آخر. تم تجاهل تعديلك.", "purchases": "مشتريات", "biggest:": "الأكبر:"};
+const KEYS=Object.keys(AR).sort((a,b)=>b.length-a.length);
+const T=x=>LG==='ar'?KEYS.reduce((v,k)=>v.includes(k)?v.split(k).join(AR[k]):v,x):x;
+function setLang(){localStorage.setItem('ht_lang',LG==='ar'?'en':'ar');location.reload()}
+if(LG==='ar'){document.documentElement.lang='ar';document.documentElement.dir='rtl';
+  const fx=n=>{if(n.nodeType===3){const v=T(n.nodeValue);if(v!==n.nodeValue)n.nodeValue=v}else if(n.nodeType===1&&n.tagName!=='SCRIPT'&&n.tagName!=='STYLE'){if(n.placeholder)n.placeholder=T(n.placeholder);n.childNodes.forEach(fx)}};
+  new MutationObserver(m=>m.forEach(r=>r.type==='childList'?r.addedNodes.forEach(fx):fx(r.target))).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['placeholder']});fx(document.body)}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+boot();
+</script></body></html>
