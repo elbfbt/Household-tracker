@@ -53,14 +53,18 @@ async function boot(){
   else if(!navigator.onLine&&localStorage.getItem('ht_hh'))hh=JSON.parse(localStorage.getItem('ht_hh'));
   hh?dashView():setupView();
 }
-function authView(msg=''){
-  app.innerHTML=`<div class="auth"><button class="link" onclick="setLang()">العربية / EN</button><h1>Household Tracker</h1><p style="color:var(--mut)">Every purchase, one tap.</p>
-  <input id="nm" placeholder="Your name (new accounts)"><input id="em" type="email" placeholder="Email" autocomplete="username"><input id="pw" type="password" placeholder="Password" autocomplete="current-password">
-  <div class="err" id="er">${esc(msg)}</div><button class="btn" id="li">Log in</button><button class="btn alt" id="su">Create account</button><button class="link" id="fp">Forgot password?</button></div>`;
+function authView(msg='',mode='in'){
+  const up=mode==='up';
+  app.innerHTML=`<div class="auth"><button class="link" onclick="setLang()">العربية / EN</button><h1>${up?'Create account':'Household Tracker'}</h1><p style="color:var(--mut)">${up?'Use your own email. Each family member needs their own account.':'Every purchase, one tap.'}</p>
+  ${up?'<input id="nm" placeholder="Your name">':''}<input id="em" type="email" placeholder="Email" autocomplete="username"><input id="pw" type="password" placeholder="Password (6+ characters)" autocomplete="${up?'new-password':'current-password'}">
+  <div class="err" id="er">${esc(msg)}</div><button class="btn" id="go">${up?'Create account':'Log in'}</button><button class="btn alt" id="sw">${up?'I already have an account':'New here? Create account'}</button>${up?'':'<button class="link" id="fp">Forgot password?</button>'}</div>`;
   const v=()=>({email:$('#em').value.trim(),password:$('#pw').value}),fail=e=>$('#er').textContent=e.message;
-  $('#li').onclick=async()=>{const{error}=await sb.auth.signInWithPassword(v());error?fail(error):boot()};
-  $('#su').onclick=async()=>{const{data,error}=await sb.auth.signUp({...v(),options:{data:{name:$('#nm').value.trim()}}});error?fail(error):data.session?boot():$('#er').textContent='Check your email to confirm, then log in.'};
-  $('#fp').onclick=async()=>{const{error}=await sb.auth.resetPasswordForEmail($('#em').value.trim(),{redirectTo:location.origin+location.pathname});$('#er').textContent=error?error.message:'Reset link sent to your email.'};
+  $('#sw').onclick=()=>authView('',up?'in':'up');
+  $('#go').onclick=async()=>{
+    if(up){const{data,error}=await sb.auth.signUp({...v(),options:{data:{name:$('#nm').value.trim()},emailRedirectTo:location.origin+location.pathname}});
+      error?fail(error):data.session?boot():$('#er').textContent='Check your email to confirm, then log in.'}
+    else{const{error}=await sb.auth.signInWithPassword(v());error?fail(error):boot()}};
+  if(!up)$('#fp').onclick=async()=>{const{error}=await sb.auth.resetPasswordForEmail($('#em').value.trim(),{redirectTo:location.origin+location.pathname});$('#er').textContent=error?error.message:'Reset link sent to your email.'};
 }
 function setupView(){
   app.innerHTML=`<div class="auth"><h1>Your household</h1><p style="color:var(--mut)">Start a new one, or join with a code.</p>
