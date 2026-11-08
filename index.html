@@ -35,8 +35,10 @@ select{width:100%;font:inherit;padding:14px;border-radius:14px;border:1px solid 
 </style></head><body><main id="app"></main>
 <div class="sheet" id="sh"><div><b id="st"></b><input id="amt" inputmode="decimal" placeholder="0"><select id="wl"></select><select id="wl2"></select><input id="nt" placeholder="Note (optional)"><button class="btn" id="sv">Save</button><button class="btn alt" onclick="sh.classList.remove('on')">Cancel</button></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"><\/script>')</script>
 <script src="config.js"></script>
 <script>
+if(!window.supabase){document.body.innerHTML='<p style="padding:30px;font:18px system-ui">The app could not load. Check your internet connection, try another network (Wi-Fi or mobile data), then reload.</p>';throw new Error('supabase-js failed to load')}
 const LG=localStorage.getItem('ht_lang')||'en';const $=s=>document.querySelector(s),app=$('#app'),sh=$('#sh');
 const sb=supabase.createClient(CFG.url,CFG.key);
 const fmt=n=>new Intl.NumberFormat(LG==='ar'?'ar-EG':'en-EG',{style:'currency',currency:'EGP',maximumFractionDigits:2}).format(n||0);
