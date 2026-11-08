@@ -32,15 +32,13 @@ select{width:100%;font:inherit;padding:14px;border-radius:14px;border:1px solid 
 .bi{margin:10px 0}.bl{display:flex;justify-content:space-between;font-size:14px}.bt{height:9px;border-radius:5px;background:var(--ln);margin-top:4px}.bt i{display:block;height:100%;border-radius:5px;background:var(--acc)}
 .kp{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kp div{background:var(--card);border:1px solid var(--ln);border-radius:16px;padding:12px}.kp small{color:var(--mut)}.kp b{display:block;font-size:20px}
 .dc{display:flex;align-items:flex-end;gap:3px;height:90px;margin:10px 0}.dc i{flex:1;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}.dn{display:flex;justify-content:space-between;align-items:center}.dn button{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:10px 16px}
-</style></head><body><main id="app"></main>
+</style></head><body><main id="app"><p style="padding:48px 20px;color:#889;font:17px system-ui">Loading…</p></main>
 <div class="sheet" id="sh"><div><b id="st"></b><input id="amt" inputmode="decimal" placeholder="0"><select id="wl"></select><select id="wl2"></select><input id="nt" placeholder="Note (optional)"><button class="btn" id="sv">Save</button><button class="btn alt" onclick="sh.classList.remove('on')">Cancel</button></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"><\/script>')</script>
 <script src="config.js"></script>
-<script>
-if(!window.supabase){document.body.innerHTML='<p style="padding:30px;font:18px system-ui">The app could not load. Check your internet connection, try another network (Wi-Fi or mobile data), then reload.</p>';throw new Error('supabase-js failed to load')}
+<script type="text/plain" id="appjs">
 const LG=localStorage.getItem('ht_lang')||'en';const $=s=>document.querySelector(s),app=$('#app'),sh=$('#sh');
-const sb=supabase.createClient(CFG.url,CFG.key);
+const sb=supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'ht-auth'}});
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 const fmt=n=>new Intl.NumberFormat(LG==='ar'?'ar-EG':'en-EG',{style:'currency',currency:'EGP',maximumFractionDigits:2}).format(n||0);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let wallets=[],hh=null,items=[],txs=[],sum={},edit=false,ch=null,status='';
@@ -48,25 +46,29 @@ const Q=()=>JSON.parse(localStorage.getItem('ht_q')||'[]'),setQ=q=>localStorage.
 
 sb.auth.onAuthStateChange((e,s)=>{ if(e==='PASSWORD_RECOVERY'){const p=prompt('New password (min 6 characters)');if(p)sb.auth.updateUser({password:p}).then(({error})=>alert(error?error.message:'Password updated'))} });
 async function boot(){
-  const {data:{session}}=await sb.auth.getSession();
-  if(!session)return authView();
-  const {data}=await sb.from('members').select('households(id,name,invite_code)').limit(1);
-  if(data&&data[0]){hh=data[0].households;localStorage.setItem('ht_hh',JSON.stringify(hh))}
-  else if(!navigator.onLine&&localStorage.getItem('ht_hh'))hh=JSON.parse(localStorage.getItem('ht_hh'));
+  const t0=await Promise.race([sb.auth.getSession(),new Promise(r=>setTimeout(()=>r(null),8000))]);
+  const session=t0&&t0.data&&t0.data.session,cached=JSON.parse(localStorage.getItem('ht_hh')||'null');
+  if(!session){if(!t0&&cached&&localStorage.getItem('ht_c')){hh=cached;return dashView()}return authView()}
+  let r;try{r=await sb.from('members').select('households(id,name,invite_code)').limit(1)}catch(e){r={error:e}}
+  if(r.data&&r.data[0]){hh=r.data[0].households;localStorage.setItem('ht_hh',JSON.stringify(hh))}
+  else if(r.error&&cached)hh=cached;
+  else if(r.error)return retryView(r.error.message);
   hh?dashView():setupView();
 }
+function retryView(m){app.innerHTML=`<div class="auth"><h1>Can't reach the server</h1><p style="color:var(--mut)">${esc(m)}</p><button class="btn" onclick="boot()">Try again</button></div>`}
 function authView(msg='',mode='in'){
   const up=mode==='up';
   app.innerHTML=`<div class="auth"><button class="link" onclick="setLang()">العربية / EN</button><h1>${up?'Create account':'Household Tracker'}</h1><p style="color:var(--mut)">${up?'Use your own email. Each family member needs their own account.':'Every purchase, one tap.'}</p>
   ${up?'<input id="nm" placeholder="Your name">':''}<input id="em" type="email" placeholder="Email" autocomplete="username"><input id="pw" type="password" placeholder="Password (6+ characters)" autocomplete="${up?'new-password':'current-password'}">
   <div class="err" id="er">${esc(msg)}</div><button class="btn alt" id="rs" hidden></button><button class="btn" id="go">${up?'Create account':'Log in'}</button><button class="btn alt" id="sw">${up?'I already have an account':'New here? Create account'}</button>${up?'':'<button class="link" id="fp">Forgot password?</button>'}</div>`;
+  try{localStorage.setItem('ht_t','1');localStorage.removeItem('ht_t')}catch(e){$('#er').textContent='Private mode detected: you will be logged out every time. Open the site in a normal tab.'}
   const v=()=>({email:$('#em').value.trim(),password:$('#pw').value}),fail=e=>$('#er').textContent=e.message;
   $('#sw').onclick=()=>authView('',up?'in':'up');
   const rs=$('#rs');let tm;
   const tick=()=>{clearInterval(tm);const f=()=>{const l=Math.ceil(((+localStorage.getItem('ht_rs')||0)-Date.now())/1000);rs.disabled=l>0;rs.textContent=l>0?`Resend in ${l}s`:'Resend confirmation email';if(l<=0)clearInterval(tm)};f();tm=setInterval(f,1000)};
   rs.onclick=async()=>{const email=$('#em').value.trim();if(!email)return fail({message:'Enter your email first.'});localStorage.setItem('ht_rs',Date.now()+60000);tick();
     const{error}=await sb.auth.resend({type:'signup',email,options:{emailRedirectTo:location.origin+location.pathname}});$('#er').textContent=error?error.message:'Confirmation email sent.'};
-  $('#go').onclick=async()=>{
+  $('#go').onclick=async()=>{localStorage.removeItem('ht_hh');localStorage.removeItem('ht_c');
     if(up){const{data,error}=await sb.auth.signUp({...v(),options:{data:{name:$('#nm').value.trim()},emailRedirectTo:location.origin+location.pathname}});
       if(error)fail(error);else if(data.session)boot();else{$('#er').textContent='Check your email to confirm, then log in.';rs.hidden=false;tick()}}
     else{const{error}=await sb.auth.signInWithPassword(v());if(!error)return boot();fail(error);if(/confirm/i.test(error.message)){rs.hidden=false;tick()}}};
@@ -75,7 +77,7 @@ function authView(msg='',mode='in'){
 function setupView(){
   app.innerHTML=`<div class="auth"><h1>Your household</h1><p style="color:var(--mut)">Start a new one, or join with a code.</p>
   <input id="hn" placeholder="Household name"><button class="btn" id="cr">Create household</button>
-  <input id="cd" placeholder="Invitation code" style="margin-top:22px"><button class="btn" id="jn">Join household</button><div class="err" id="er"></div><button class="link" onclick="sb.auth.signOut().then(boot)">Log out</button></div>`;
+  <input id="cd" placeholder="Invitation code" style="margin-top:22px"><button class="btn" id="jn">Join household</button><div class="err" id="er"></div><button class="link" onclick="sb.auth.signOut().then(()=>{localStorage.removeItem('ht_hh');localStorage.removeItem('ht_c');boot()})">Log out</button></div>`;
   const go=async(fn,a)=>{const{error}=await sb.rpc(fn,a);error?$('#er').textContent=error.message:boot()};
   $('#cr').onclick=()=>go('create_household',{hname:$('#hn').value.trim()||'Home'});
   $('#jn').onclick=()=>go('join_household',{code:$('#cd').value});
@@ -87,14 +89,14 @@ async function dashView(){
   <h2>Quick purchases ${''}<button class="link" id="ed"></button></h2><div class="grid" id="qi"></div>
   <div class="grid"><button class="tile" data-t="expense">Custom expense</button><button class="tile" data-t="deposit">Cash back to bank</button><button class="tile" data-t="transfer">Transfer</button></div>
   <h2>Recent</h2><div id="tl"></div></div><div id="more" hidden></div>`;
-  $('#lo').onclick=()=>sb.auth.signOut().then(()=>{hh=null;boot()});
+  $('#lo').onclick=()=>sb.auth.signOut().then(()=>{hh=null;localStorage.removeItem('ht_hh');localStorage.removeItem('ht_c');boot()});
   $('#inv').onclick=()=>{const t=`Join our household in Household Tracker with code: ${hh.invite_code}\n${location.origin+location.pathname}`;navigator.share?navigator.share({text:t}):prompt('Send this to your family:',t)};
   $('#ed').onclick=()=>{edit=!edit;paint()};document.querySelectorAll('#nv button').forEach(b=>b.onclick=()=>tab(b.dataset.n));
   document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>openSheet(b.dataset.t));
   addEventListener('online',flush);addEventListener('offline',netPaint);
   if(ch)sb.removeChannel(ch);
   ch=sb.channel('tx').on('postgres_changes',{event:'*',schema:'public',table:'transactions',filter:`household_id=eq.${hh.id}`},load).subscribe();
-  await load();flush();
+  {const c=JSON.parse(localStorage.getItem('ht_c')||'null');if(c){({sum,items,txs,wallets}=c);paint()}}await load();flush();
 }
 function netPaint(){const n=$('#net');if(!n)return;const q=Q().length;const s=!navigator.onLine?'off':q?'sync':'';n.className=s;$('#ns').textContent=s==='off'?`Offline${q?` · ${q} waiting`:''}`:q?`Syncing ${q}…`:'Online'}
 async function load(){
@@ -212,7 +214,7 @@ async function histView(){
 }
 
 
-const AR={"Not enough in this wallet. Save anyway?":"الرصيد في هذه المحفظة لا يكفي. هل تريد الحفظ على أي حال؟","Household Tracker": "متتبع المنزل", "Every purchase, one tap.": "كل مشترياتك بنقرة واحدة.", "Your name (new accounts)": "اسمك (للحسابات الجديدة)", "Email": "البريد الإلكتروني", "Password": "كلمة المرور", "Log in": "تسجيل الدخول", "Create account": "إنشاء حساب", "Forgot password?": "نسيت كلمة المرور؟", "Check your email to confirm, then log in.": "تحقق من بريدك للتأكيد ثم سجل الدخول.", "Reset link sent to your email.": "أُرسل رابط الاستعادة إلى بريدك.", "Your household": "أسرتك", "Start a new one, or join with a code.": "أنشئ أسرة جديدة أو انضم برمز.", "Household name": "اسم الأسرة", "Create household": "إنشاء أسرة", "Invitation code": "رمز الدعوة", "Join household": "الانضمام للأسرة", "Log out": "تسجيل الخروج", "Invite code:": "رمز الدعوة:", "Online": "متصل", "Offline": "غير متصل", "waiting to sync": "بانتظار المزامنة", "waiting": "بالانتظار", "Syncing": "مزامنة", "Total balance": "الرصيد الإجمالي", "Today": "اليوم", "This week": "هذا الأسبوع", "This month": "هذا الشهر", "Withdraw cash": "سحب نقدي", "Bank → household cash": "من البنك إلى النقدية", "Add income": "إضافة دخل", "Quick purchases": "مشتريات سريعة", "Edit prices": "تعديل الأسعار", "Done": "تم", "Custom expense": "مصروف آخر", "Cash back to bank": "إيداع في البنك", "Recent": "الأخيرة", "Transfer": "تحويل", "Home": "الرئيسية", "Daily": "اليومي", "Stats": "الإحصاءات", "History": "السجل", "Save": "حفظ", "Cancel": "إلغاء", "Note (optional)": "ملاحظة (اختياري)", "What was it?": "ما هو؟", "Expense": "مصروف", "Bread": "عيش", "Fish": "سمك", "Chicken": "فراخ", "Meat": "لحمة", "Rice": "أرز", "Vegetables": "خضار", "Fruits": "فاكهة", "Milk": "لبن", "Eggs": "بيض", "Other groceries": "بقالة أخرى", "Household cash": "نقدية المنزل", "Bank account": "حساب بنكي", "Personal cash": "نقدية شخصية", "Spent": "المصروف", "Income": "الدخل", "Search": "بحث", "All categories": "كل الفئات", "Everyone": "الجميع", "Newest first": "الأحدث أولاً", "Oldest first": "الأقدم أولاً", "Highest amount": "الأعلى مبلغاً", "Lowest amount": "الأقل مبلغاً", "Week": "أسبوع", "Month": "شهر", "Custom": "مخصص", "Spending per day": "الصرف اليومي", "By category": "حسب الفئة", "By person": "حسب الشخص", "Most bought": "الأكثر شراءً", "Biggest purchases": "أكبر المشتريات", "Purchases": "المشتريات", "Household spending": "مصروف الأسرة", "Nothing yet.": "لا شيء بعد.", "No transactions yet. Withdraw cash to start.": "لا توجد معاملات بعد. اسحب نقداً للبدء.", "No matching transactions.": "لا توجد نتائج.", "No purchases on this day.": "لا مشتريات في هذا اليوم.", "You": "أنت", "This screen needs an internet connection.": "هذه الشاشة تحتاج إلى إنترنت.", "Delete this transaction?": "حذف هذه المعاملة؟", "New amount": "المبلغ الجديد", "Choose two different wallets": "اختر محفظتين مختلفتين", "Changed on another device. Your edit was skipped.": "تم التعديل من جهاز آخر. تم تجاهل تعديلك.", "purchases": "مشتريات", "biggest:": "الأكبر:"
+const AR={"Can't reach the server":"تعذر الوصول إلى الخادم","Try again":"حاول مرة أخرى","Private mode detected: you will be logged out every time. Open the site in a normal tab.":"الوضع الخاص مفعّل: سيتم تسجيل خروجك في كل مرة. افتح الموقع في تبويب عادي.","Not enough in this wallet. Save anyway?":"الرصيد في هذه المحفظة لا يكفي. هل تريد الحفظ على أي حال؟","Household Tracker": "متتبع المنزل", "Every purchase, one tap.": "كل مشترياتك بنقرة واحدة.", "Your name (new accounts)": "اسمك (للحسابات الجديدة)", "Email": "البريد الإلكتروني", "Password": "كلمة المرور", "Log in": "تسجيل الدخول", "Create account": "إنشاء حساب", "Forgot password?": "نسيت كلمة المرور؟", "Check your email to confirm, then log in.": "تحقق من بريدك للتأكيد ثم سجل الدخول.", "Reset link sent to your email.": "أُرسل رابط الاستعادة إلى بريدك.", "Your household": "أسرتك", "Start a new one, or join with a code.": "أنشئ أسرة جديدة أو انضم برمز.", "Household name": "اسم الأسرة", "Create household": "إنشاء أسرة", "Invitation code": "رمز الدعوة", "Join household": "الانضمام للأسرة", "Log out": "تسجيل الخروج", "Invite code:": "رمز الدعوة:", "Online": "متصل", "Offline": "غير متصل", "waiting to sync": "بانتظار المزامنة", "waiting": "بالانتظار", "Syncing": "مزامنة", "Total balance": "الرصيد الإجمالي", "Today": "اليوم", "This week": "هذا الأسبوع", "This month": "هذا الشهر", "Withdraw cash": "سحب نقدي", "Bank → household cash": "من البنك إلى النقدية", "Add income": "إضافة دخل", "Quick purchases": "مشتريات سريعة", "Edit prices": "تعديل الأسعار", "Done": "تم", "Custom expense": "مصروف آخر", "Cash back to bank": "إيداع في البنك", "Recent": "الأخيرة", "Transfer": "تحويل", "Home": "الرئيسية", "Daily": "اليومي", "Stats": "الإحصاءات", "History": "السجل", "Save": "حفظ", "Cancel": "إلغاء", "Note (optional)": "ملاحظة (اختياري)", "What was it?": "ما هو؟", "Expense": "مصروف", "Bread": "عيش", "Fish": "سمك", "Chicken": "فراخ", "Meat": "لحمة", "Rice": "أرز", "Vegetables": "خضار", "Fruits": "فاكهة", "Milk": "لبن", "Eggs": "بيض", "Other groceries": "بقالة أخرى", "Household cash": "نقدية المنزل", "Bank account": "حساب بنكي", "Personal cash": "نقدية شخصية", "Spent": "المصروف", "Income": "الدخل", "Search": "بحث", "All categories": "كل الفئات", "Everyone": "الجميع", "Newest first": "الأحدث أولاً", "Oldest first": "الأقدم أولاً", "Highest amount": "الأعلى مبلغاً", "Lowest amount": "الأقل مبلغاً", "Week": "أسبوع", "Month": "شهر", "Custom": "مخصص", "Spending per day": "الصرف اليومي", "By category": "حسب الفئة", "By person": "حسب الشخص", "Most bought": "الأكثر شراءً", "Biggest purchases": "أكبر المشتريات", "Purchases": "المشتريات", "Household spending": "مصروف الأسرة", "Nothing yet.": "لا شيء بعد.", "No transactions yet. Withdraw cash to start.": "لا توجد معاملات بعد. اسحب نقداً للبدء.", "No matching transactions.": "لا توجد نتائج.", "No purchases on this day.": "لا مشتريات في هذا اليوم.", "You": "أنت", "This screen needs an internet connection.": "هذه الشاشة تحتاج إلى إنترنت.", "Delete this transaction?": "حذف هذه المعاملة؟", "New amount": "المبلغ الجديد", "Choose two different wallets": "اختر محفظتين مختلفتين", "Changed on another device. Your edit was skipped.": "تم التعديل من جهاز آخر. تم تجاهل تعديلك.", "purchases": "مشتريات", "biggest:": "الأكبر:"
 ,"New here? Create account":"جديد؟ أنشئ حساباً","I already have an account":"لدي حساب بالفعل","Use your own email. Each family member needs their own account.":"استخدم بريدك الخاص. كل فرد من الأسرة يحتاج حسابه.","Your name":"اسمك","Password (6+ characters)":"كلمة المرور (6 أحرف على الأقل)","Resend confirmation email":"إعادة إرسال رسالة التأكيد","Resend in":"إعادة الإرسال خلال","Confirmation email sent.":"أُرسلت رسالة التأكيد.","Enter your email first.":"أدخل بريدك أولاً."};
 const KEYS=Object.keys(AR).sort((a,b)=>b.length-a.length);
 const T=x=>LG==='ar'?KEYS.reduce((v,k)=>v.includes(k)?v.split(k).join(AR[k]):v,x):x;
@@ -226,4 +228,12 @@ const bal=()=>{const m={};wallets.forEach(w=>m[w.id]=+w.balance);Q().filter(r=>!
   if(r.type==='income')m[f]=(m[f]||0)+a;else if(r.type==='expense')m[f]=(m[f]||0)-a;else{m[f]=(m[f]||0)-a;m[r.to_wallet_id]=(m[r.to_wallet_id]||0)+a}});return m};
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
 boot();
-</script></body></html>
+</script>
+<script>
+(function(){var done=0,fails=0,S=['supabase.min.js','https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js','https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js','https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js'];
+function go(){if(done)return;done=1;var e=document.createElement('script');e.textContent=document.getElementById('appjs').textContent;document.body.appendChild(e)}
+function bad(){if(++fails>=S.length&&!done)document.getElementById('app').innerHTML='<p style="padding:30px;font:18px system-ui">The app could not load. Check your internet connection, try Wi-Fi or mobile data, then reload.</p>'}
+S.forEach(function(u){var e=document.createElement('script');e.src=u;e.async=true;e.onload=function(){window.supabase?go():bad()};e.onerror=bad;document.head.appendChild(e)});
+})();
+</script>
+</body></html>

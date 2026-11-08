@@ -1,8 +1,10 @@
-const C='ht-v1', SHELL=['./','index.html','config.js','manifest.json','icon-192.png','icon-180.png'];
+const C='ht-v2',SHELL=['./','index.html','config.js','manifest.json','icon-192.png','icon-180.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim()});
+const put=(q,r)=>{if(r.ok||r.type==='opaque'){const cp=r.clone();caches.open(C).then(c=>c.put(q,cp))}return r};
 self.addEventListener('fetch',e=>{
-  const u=new URL(e.request.url);
-  if(e.request.method!=='GET'||u.hostname.endsWith('supabase.co'))return;
-  e.respondWith(fetch(e.request).then(r=>{const cp=r.clone();caches.open(C).then(c=>c.put(e.request,cp));return r}).catch(()=>caches.match(e.request).then(m=>m||caches.match('index.html'))));
+  const q=e.request,u=new URL(q.url);
+  if(q.method!=='GET'||u.hostname.endsWith('supabase.co'))return;
+  if(u.origin!==location.origin)return e.respondWith(caches.match(q).then(m=>m||fetch(q).then(r=>put(q,r))));
+  e.respondWith(caches.match(q).then(m=>{const n=fetch(q).then(r=>put(q,r)).catch(()=>m||caches.match('index.html'));return m||n}));
 });
