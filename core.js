@@ -8,7 +8,7 @@ function effects(r){const a=cents(r.amount);
   if(r.type==='expense')return[[r.wallet_id,-a]];
   return[[r.wallet_id,-a],[r.to_wallet_id,a]]}
 const live=q=>q.filter(o=>!o.state||o.state==='pending');
-function pendingEffects(queue){const out=[];for(const o of live(queue)){
+function pendingEffects(queue){const out=[];for(const o of live(queue)){if(o.op==='qi')continue;
   if(!o.op)out.push(...effects(o));
   else{effects(o.old).forEach(([w,c])=>out.push([w,-c]));if(o.op==='upd')out.push(...effects({...o.old,...o.patch}))}}
   return out}
@@ -25,7 +25,7 @@ function cairoStart(ymd){const guess=Date.parse(ymd+'T00:00:00Z');
   let t=guess-off(guess);t=guess-off(t);return new Date(t).toISOString()}
 function spendDeltas(queue,now){const P=periods(now),d={today:0,week:0,month:0};
   const add=(r,s)=>{if(r.type!=='expense')return;const y=cairoYmd(r.created_at),c=s*cents(r.amount);if(y>=P.today)d.today+=c;if(y>=P.week)d.week+=c;if(y>=P.month)d.month+=c};
-  for(const o of live(queue)){if(!o.op)add(o,1);else{add(o.old,-1);if(o.op==='upd')add({...o.old,...o.patch},1)}}
+  for(const o of live(queue)){if(o.op==='qi')continue;if(!o.op)add(o,1);else{add(o.old,-1);if(o.op==='upd')add({...o.old,...o.patch},1)}}
   return{today:d.today/100,week:d.week/100,month:d.month/100}}
 /* ---- numbers typed on Arabic/English keyboards ---- */
 const num=v=>{let x=String(v).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/٫/g,'.').replace(/\s/g,'');x=/^\d{1,3}([,،]\d{3})+(\.\d+)?$/.test(x)?x.replace(/[,،]/g,''):x.replace(/[,،]/g,'.');return +x};
@@ -49,12 +49,13 @@ function Queue(store,uid){if(!uid)throw new Error('Queue needs a user id');
     mark(qid,state,err){wr(rd(key).map(o=>o.qid===qid?{...o,state,err:err||''}:o))},
     bump(qid){wr(rd(key).map(o=>o.qid===qid?{...o,tries:(o.tries||0)+1}:o))},
     remove(qid){wr(rd(key).filter(o=>o.qid!==qid))},
-    discard(qid){const o=rd(key).find(x=>x.qid===qid);if(o){store.setItem(tkey,JSON.stringify([...rd(tkey),{...o,discarded_at:new Date().toISOString()}]));wr(rd(key).filter(x=>x.qid!==qid))}},
+    discard(qid){const all=rd(key),o=all.find(x=>x.qid===qid);if(o){const gone=all.filter(x=>x.qid===qid||x.dep===qid);store.setItem(tkey,JSON.stringify([...rd(tkey),...gone.map(x=>({...x,discarded_at:new Date().toISOString()}))]));wr(all.filter(x=>!gone.includes(x)))}},
     rebase(id,base){wr(rd(key).map(o=>o.op==='upd'&&o.id===id&&o.state==='pending'?{...o,base}:o))}}}
 function foreign(store,uid){let ix=[];try{ix=JSON.parse(store.getItem('ht_qusers')||'[]')}catch(e){}
   return ix.filter(u=>u!==uid).map(u=>{let a=[];try{a=JSON.parse(store.getItem('ht_q:'+u)||'[]')}catch(e){}return{uid:u,count:a.length}}).filter(x=>x.count)}
-async function sync(q,uid,env){const res={synced:0,failed:0,conflict:0,stopped:null};
+async function sync(q,uid,env){const res={synced:0,failed:0,conflict:0,stopped:null,errors:[]};
   for(const id of q.all().map(x=>x.qid)){const o=q.all().find(x=>x.qid===id);if(!o||o.state!=='pending'||o.uid!==uid)continue;
+    if(o.dep&&q.all().some(x=>x.qid===o.dep))continue;
     if(!env.online()){res.stopped='network';break}
     if(await env.sessionUid()!==uid){res.stopped='auth';break}
     let r;try{r=await env.exec(o)}catch(e){r={error:e}}
@@ -63,7 +64,7 @@ async function sync(q,uid,env){const res={synced:0,failed:0,conflict:0,stopped:n
     if(k==='ok'||k==='duplicate'){q.remove(o.qid);res.synced++;if(o.op==='upd'&&r.updated_at)q.rebase(o.id,r.updated_at);continue}
     if(k==='network'){q.bump(o.qid);res.stopped='network';break}
     if(k==='auth'){res.stopped='auth';break}
-    q.mark(o.qid,'failed',String((r.error&&r.error.message)||r.error));res.failed++}
+    const msg=String((r.error&&r.error.message)||r.error);q.mark(o.qid,'failed',msg);res.errors.push(msg);res.failed++}
   return res}
 const api={cents,sign,effects,pendingEffects,balances,cairoYmd,addDays,periods,cairoStart,spendDeltas,num,classify,Queue,foreign,sync,MOVES:['withdraw','deposit','transfer']};
 g.Core=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
