@@ -66,6 +66,13 @@ async function sync(q,uid,env){const res={synced:0,failed:0,conflict:0,stopped:n
     if(k==='auth'){res.stopped='auth';break}
     const msg=String((r.error&&r.error.message)||r.error);q.mark(o.qid,'failed',msg);res.errors.push(msg);res.failed++}
   return res}
-const api={cents,sign,effects,pendingEffects,balances,cairoYmd,addDays,periods,cairoStart,spendDeltas,num,classify,Queue,foreign,sync,MOVES:['withdraw','deposit','transfer']};
+/* ---- Quick Purchase icon: derived from the NAME (no stored image), always returns something ---- */
+const QI=[[/bread|bakery|toast|خبز|عيش|توست|فينو|مخبز/i,'🍞'],[/chicken|poultry|فراخ|دجاج|فرخة/i,'🍗'],[/egg|بيض/i,'🥚'],[/fish|tuna|shrimp|سمك|جمبري|تونة/i,'🐟'],
+[/milk|dairy|cheese|yogh?urt|لبن|حليب|جبن|زبادي/i,'🥛'],[/\brice\b|pasta|macaroni|noodle|أرز|ارز|\bرز\b|مكرونة|مكرونه/i,'🍚'],[/meat|beef|lamb|كفتة|لحم|لحمة|بانيه/i,'🥩'],
+[/vegetable|\bveg\b|tomato|potato|onion|salad|خضار|خضروات|طماطم|بطاطس|بصل|خيار/i,'🥬'],[/fruit|apple|banana|orange|mango|فاكهة|فواكه|تفاح|موز|برتقال|مانجو/i,'🍎'],
+[/coffee|\btea\b|قهوة|شاي/i,'☕'],[/water|juice|soda|drink|مياه|مية|عصير|مشروب/i,'🥤'],[/\boil\b|sugar|salt|flour|زيت|سكر|ملح|دقيق/i,'🧂'],
+[/soap|clean|detergent|صابون|منظف|نظافة/i,'🧼'],[/medic|pharm|دواء|علاج|صيدلية/i,'💊'],[/fuel|petrol|\bgas\b|taxi|uber|\bbus\b|بنزين|مواصلات|تاكسي/i,'🚗']];
+const qicon=n=>{const s=String(n||'');for(const [r,e] of QI)if(r.test(s))return e;return'🛒'};
+const api={cents,sign,effects,pendingEffects,balances,cairoYmd,addDays,periods,cairoStart,spendDeltas,num,qicon,classify,Queue,foreign,sync,MOVES:['withdraw','deposit','transfer']};
 g.Core=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

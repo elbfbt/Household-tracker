@@ -5,47 +5,82 @@
 <meta name="theme-color" content="#12302e"><meta name="color-scheme" content="light dark"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png"><link rel="apple-touch-startup-image" media="(device-width:390px) and (device-height:844px) and (-webkit-device-pixel-ratio:3)" href="splash-1170x2532.png"><link rel="apple-touch-startup-image" media="(device-width:393px) and (device-height:852px) and (-webkit-device-pixel-ratio:3)" href="splash-1179x2556.png"><link rel="apple-touch-startup-image" media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3)" href="splash-1290x2796.png">
 <title>Household Tracker</title>
 <style>
-:root{--ink:#12302e;--bg:#f1f5f4;--card:#fff;--tx:#14201f;--mut:#667472;--acc:#f2a93b;--bad:#c8412b;--ok:#1f8a63;--ln:#dde5e3}
-@media(prefers-color-scheme:dark){:root{--bg:#0c1615;--card:#14231f;--tx:#e8f0ee;--mut:#8da39f;--ln:#243532}}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}main{max-width:520px;margin:0 auto;padding:12px 14px 40px}
-.hero{background:var(--ink);color:#fff;border-radius:22px;padding:18px 18px 16px;margin-top:6px}
-.hero small{opacity:.7}.bal{font-size:40px;font-weight:700;letter-spacing:-.02em}.row{display:flex;gap:10px}.row>div{flex:1}.row b{display:block;font-size:17px}
-.bar{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut);padding:6px 4px}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-inline-end:6px}.off .dot{background:var(--bad)}.sync .dot{background:var(--acc)}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
-button{font:inherit;color:inherit;border:0;cursor:pointer}.tile{background:var(--card);border:1px solid var(--ln);border-radius:18px;min-height:76px;padding:12px;text-align:start;font-weight:600}
-.tile span{display:block;font-weight:400;color:var(--mut);font-size:14px}.tile.big{background:var(--acc);color:#2a1d00;border:0}.tile.inc{border-color:var(--ok)}
-h2{font-size:15px;margin:20px 4px 8px;color:var(--mut);font-weight:600}
-.tx{display:flex;justify-content:space-between;gap:8px;background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:6px;border:1px solid var(--ln)}
-.tx small{color:var(--mut)}.amt{font-weight:700;white-space:nowrap}.neg{color:var(--bad)}.pos{color:var(--ok)}.x{background:none;color:var(--mut);font-size:20px;padding:0 4px}
-input{width:100%;font:inherit;padding:14px;border-radius:14px;border:1px solid var(--ln);background:var(--card);color:var(--tx);margin:6px 0}
-.btn{width:100%;padding:15px;border-radius:14px;background:var(--ink);color:#fff;font-weight:700;margin-top:8px}.btn.alt{background:none;color:var(--mut);font-weight:500}
-.sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:#0007;display:none;align-items:flex-end;z-index:9}.sheet.on{display:flex}
-.sheet>div{background:var(--bg);width:100%;max-width:520px;margin:0 auto;border-radius:24px 24px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom))}
-#amt{font-size:34px;font-weight:700;text-align:center}.link{background:none;color:var(--mut);text-decoration:underline;font-size:13px}.auth{padding-top:8vh}.auth h1{font-size:30px;margin:0 0 4px}.err{color:var(--bad);min-height:20px}
-
-#nv{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom);z-index:5}
-#nv button{flex:1;padding:14px 0;background:none;color:var(--mut);font-weight:600}#nv button.on{color:var(--tx);box-shadow:inset 0 3px var(--acc)}main{padding-bottom:90px}
-select{width:100%;font:inherit;padding:14px;border-radius:14px;border:1px solid var(--ln);background:var(--card);color:var(--tx);margin:6px 0}
-.chips{display:flex;gap:8px;margin:6px 0}.chips button{flex:1;padding:11px 0;border-radius:12px;background:var(--card);border:1px solid var(--ln)}.chips button.on{background:var(--ink);color:#fff}
-.bi{margin:10px 0}.bl{display:flex;justify-content:space-between;font-size:14px}.bt{height:9px;border-radius:5px;background:var(--ln);margin-top:4px}.bt i{display:block;height:100%;border-radius:5px;background:var(--acc)}
-.kp{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kp div{background:var(--card);border:1px solid var(--ln);border-radius:16px;padding:12px}.kp small{color:var(--mut)}.kp b{display:block;font-size:20px}
-.dc{display:flex;align-items:flex-end;gap:3px;height:90px;margin:10px 0}.dc i{flex:1;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}.dn{display:flex;justify-content:space-between;align-items:center}.dn button{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:10px 16px}
-
-:root{color-scheme:light dark}html{-webkit-text-size-adjust:100%;text-size-adjust:100%}[hidden]{display:none!important}
-button{-webkit-appearance:none;appearance:none}input[type=date]{min-width:0;min-height:50px;-webkit-appearance:none;appearance:none}
-.bal{font-size:clamp(30px,9vw,44px)}.auth{max-width:440px;margin:0 auto}#more{max-width:760px;margin:0 auto}
-#nv{max-width:760px;margin:0 auto}.sheet>div{max-height:92vh;overflow:auto;-webkit-overflow-scrolling:touch}
-@media(min-width:600px){main{max-width:760px;padding-left:24px;padding-right:24px}.grid{grid-template-columns:repeat(3,1fr)}.sheet{align-items:center}.sheet>div{border-radius:24px;max-width:460px}}
-@media(min-width:900px){main{max-width:1100px;padding-bottom:40px}.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:32px;align-items:start}
-.cols>div+div{position:sticky;top:64px;max-height:calc(100vh - 90px);overflow:auto}
-#nv{position:sticky;top:0;bottom:auto;max-width:none;border-top:0;border-bottom:1px solid var(--ln);border-radius:0 0 16px 16px;margin-bottom:6px}#nv button.on{box-shadow:inset 0 -3px var(--acc)}#more{max-width:900px}}
-@media(hover:hover){.tile:hover,.btn:hover{filter:brightness(1.06)}}
-.syb{background:#c8412b22;border:1px solid var(--bad);border-radius:12px;padding:10px 12px;margin:6px 0;display:flex;flex-direction:column;gap:4px}
-.qrow{display:flex;align-items:center;gap:10px;padding:10px 4px;font-weight:600}.qrow input{width:22px;height:22px;margin:0}.btn.danger{background:var(--bad);color:#fff}.link.danger{color:var(--bad)}.wl{color:var(--tx);opacity:.8}
+:root{--g:#0d4f3c;--g2:#0f5a43;--lk:#0d4f3c;--mint:#e8f5f0;--bg:#f7f7f5;--card:#fff;--tx:#14201c;--mut:#6b7773;--ln:#e6ece9;--bad:#c8412b;--ok:#1f8a63;--sh:0 1px 2px rgba(13,79,60,.05),0 6px 18px rgba(13,79,60,.07);color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1411;--card:#13221d;--tx:#e9f1ee;--mut:#8ea39d;--ln:#223630;--mint:#173229;--g:#14674f;--g2:#0f5a43;--lk:#5fcfa6;--sh:0 1px 2px #0006}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{padding:env(safe-area-inset-top) 0 0}
+main{max-width:520px;margin:0 auto;padding:6px 16px calc(112px + env(safe-area-inset-bottom))}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;border:0;cursor:pointer;background:none;-webkit-appearance:none;appearance:none;transition:transform .15s,filter .15s,background .15s}
+button:active{transform:scale(.97)}
+:focus-visible{outline:3px solid var(--lk);outline-offset:2px;border-radius:12px}
+input,select{width:100%;font:inherit;padding:14px 16px;border-radius:16px;border:1.5px solid var(--ln);background:var(--card);color:var(--tx);margin:6px 0;min-height:52px}
+input[type=date]{min-width:0;-webkit-appearance:none;appearance:none}
+input:focus,select:focus{border-color:var(--g);outline:none;box-shadow:0 0 0 4px rgba(13,79,60,.14)}
+h2{font-size:19px;font-weight:700;margin:0;letter-spacing:-.01em}small{color:var(--mut)}
+#home{position:relative}#more{max-width:760px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:center;padding:10px 0 8px}
+.brand{display:flex;align-items:center;gap:10px;font-size:18px;letter-spacing:-.01em}
+.logo{width:34px;height:34px;border-radius:11px;background:var(--g);color:#fff;display:grid;place-items:center}.logo svg{width:20px;height:20px}
+.tools{display:flex;align-items:center;gap:8px}
+.ic{width:42px;height:42px;border-radius:14px;background:var(--card);box-shadow:var(--sh);display:grid;place-items:center}
+.st{font-size:12px;color:var(--mut);background:var(--card);box-shadow:var(--sh);border-radius:99px;padding:6px 11px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-inline-end:6px}.off .dot{background:var(--bad)}.sync .dot{background:#e0a030;animation:pulse 1s infinite alternate}
+@keyframes pulse{to{opacity:.35}}
+.menu{position:absolute;inset-inline-end:0;top:60px;z-index:20;background:var(--card);border-radius:20px;box-shadow:0 12px 40px rgba(0,0,0,.2);padding:6px;min-width:230px}
+.mi{display:flex;gap:10px;width:100%;padding:13px 14px;border-radius:14px;text-align:start;font-weight:600}.mi:hover{background:var(--mint)}.mi.dg{color:var(--bad)}
+.hero{position:relative;overflow:hidden;color:#fff;border-radius:28px;padding:22px 22px 18px;margin:6px 0 14px;background:radial-gradient(circle at 108% -8%,rgba(255,255,255,.14) 0 24%,transparent 25%),radial-gradient(circle at -6% 118%,rgba(255,255,255,.09) 0 30%,transparent 31%),linear-gradient(150deg,var(--g2),var(--g));box-shadow:0 14px 30px rgba(13,79,60,.28)}
+.hero small{color:rgba(255,255,255,.74)}.ht{display:flex;justify-content:space-between;align-items:center}
+.pill{background:rgba(255,255,255,.16);color:#fff;border-radius:99px;padding:7px 13px;font-size:13px;font-weight:600}
+.bal{font-size:clamp(32px,10vw,46px);font-weight:800;letter-spacing:-.025em;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.spent{font-size:14px}.spent b{margin-inline-start:6px}
+.hero .row{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.2)}.hero .row>div{flex:1}.hero .row b{display:block;font-size:15px;margin-top:2px;font-variant-numeric:tabular-nums}
+.wgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}#wb{display:contents}
+.wc{background:var(--card);box-shadow:var(--sh);border-radius:22px;padding:14px;text-align:start;display:flex;flex-direction:column;min-height:112px;position:relative}
+.wc b{font-size:19px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;margin-top:auto}.wc small{font-size:13px}
+.wi{width:38px;height:38px;border-radius:50%;background:var(--mint);color:var(--lk);display:grid;place-items:center;margin-bottom:8px}
+.wc.act{background:var(--mint)}.wc.act b{font-size:14px;color:var(--lk);font-weight:600}.go{position:absolute;inset-inline-end:14px;top:14px;color:var(--lk)}
+.cta{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--g);color:#fff;font-weight:700;font-size:18px;padding:18px;border-radius:20px;box-shadow:0 10px 22px rgba(13,79,60,.25)}
+.pl{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:grid;place-items:center}.pl svg{width:16px;height:16px}
+.chips2{display:flex;gap:8px;margin:12px 0 4px;flex-wrap:wrap}.chips2 button{flex:1 1 30%;background:var(--card);box-shadow:var(--sh);border-radius:16px;padding:12px 8px;font-weight:600;font-size:14px;min-height:48px}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:22px 2px 10px}
+.link{color:var(--lk);font-weight:600;font-size:14px;padding:6px 4px}.link.danger{color:var(--bad)}
+.qgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.qc{background:var(--card);box-shadow:var(--sh);border-radius:22px;padding:14px;text-align:start;display:flex;align-items:center;gap:12px;min-height:76px}
+.qe{width:44px;height:44px;border-radius:50%;background:var(--mint);display:grid;place-items:center;font-size:22px;flex:none}.qc b{display:block;font-weight:700;overflow-wrap:anywhere}.qc small{font-size:13px;font-variant-numeric:tabular-nums}
+.tx{display:flex;align-items:center;gap:12px;background:var(--card);box-shadow:var(--sh);border-radius:20px;padding:12px 14px;margin-bottom:10px}.tx>div:first-child{flex:1;min-width:0}
+.ti{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--mint);color:var(--lk)}.ti.neg{background:#c8412b1a;color:var(--bad)}.ti.pos{background:#1f8a631f;color:var(--ok)}.ti svg{width:19px;height:19px}
+.tm{flex:1;min-width:0}.tm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tm small{display:block;font-size:12.5px;line-height:1.35}.wl{color:var(--tx);opacity:.78}
+.ta{display:flex;align-items:center;gap:4px;flex:none}.amt{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}.pos{color:var(--ok)}.neg{color:var(--bad)}.x{font-size:22px;color:var(--mut);padding:2px 8px}
+#nv{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));max-width:496px;margin:0 auto;display:flex;background:var(--card);border-radius:26px;box-shadow:0 10px 36px rgba(13,50,40,.22);padding:6px;z-index:5}
+#nv button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 10px;border-radius:20px;color:var(--mut);font-size:12px;font-weight:600;position:relative}
+#nv button svg{width:23px;height:23px}#nv button.on{color:var(--lk)}#nv button.on::after{content:"";position:absolute;bottom:3px;width:22px;height:3px;border-radius:3px;background:var(--lk)}
+.sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(10,25,20,.45);display:none;align-items:flex-end;z-index:30}.sheet.on{display:flex;animation:fade .2s}
+@keyframes fade{from{opacity:0}}@keyframes up{from{transform:translateY(30px);opacity:.6}}
+.sheet>div{background:var(--bg);width:100%;max-width:520px;margin:0 auto;border-radius:28px 28px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto;-webkit-overflow-scrolling:touch;animation:up .25s ease}
+#st{font-size:20px;font-weight:700}#amt{font-size:36px;font-weight:800;text-align:center;min-height:68px;letter-spacing:-.02em}.lb{display:block;margin:12px 4px 0;font-weight:600;font-size:13px}
+.qrow{display:flex;align-items:center;gap:10px;padding:12px 4px;font-weight:600}.qrow input{width:24px;height:24px;margin:0;min-height:0;accent-color:var(--g)}
+.btn{width:100%;padding:16px;border-radius:18px;background:var(--g);color:#fff;font-weight:700;font-size:17px;margin-top:10px;min-height:54px}.btn.alt{background:var(--card);color:var(--lk);box-shadow:var(--sh)}.btn.danger{background:var(--bad);color:#fff}.btn:disabled{opacity:.45}
+.auth{max-width:420px;margin:0 auto;padding-top:8vh}.auth h1{font-size:30px;letter-spacing:-.02em;margin:10px 0 4px}.err{color:var(--bad);min-height:20px;font-size:14px}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+.card{background:var(--card);box-shadow:var(--sh);border-radius:22px;padding:18px;margin-top:12px}.dz{border:1.5px solid #c8412b66}
+.chips{display:flex;gap:8px;margin:8px 0}.chips button{flex:1;padding:11px 0;border-radius:14px;background:var(--card);box-shadow:var(--sh);font-weight:600}.chips button.on{background:var(--g);color:#fff}
+.kp{display:grid;grid-template-columns:1fr 1fr;gap:12px}.kp div{background:var(--card);box-shadow:var(--sh);border-radius:20px;padding:14px}.kp b{display:block;font-size:20px}
+.bi{margin:12px 0}.bl{display:flex;justify-content:space-between;font-size:14px;gap:8px}.bt{height:10px;border-radius:6px;background:var(--mint);margin-top:6px;overflow:hidden}.bt i{display:block;height:100%;border-radius:6px;background:var(--g)}
+.dc{display:flex;align-items:flex-end;gap:4px;height:100px;margin:12px 0}.dc i{flex:1;background:var(--g);opacity:.85;border-radius:6px 6px 0 0;min-height:3px}
+.dn{display:flex;justify-content:space-between;align-items:center;gap:10px}.dn button{background:var(--card);box-shadow:var(--sh);border-radius:14px;padding:12px 18px;font-size:18px}.dn input{flex:1;margin:0;text-align:center}
+.syb{background:#c8412b14;border:1px solid #c8412b55;border-radius:16px;padding:10px 12px;margin:6px 0;display:flex;flex-direction:column;gap:4px}
+#toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:#14201c;color:#fff;padding:13px 18px;border-radius:16px;font-weight:600;opacity:0;pointer-events:none;transition:.2s;max-width:min(92vw,440px);z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.3)}#toast.on{opacity:1;transform:translate(-50%,0)}#toast.bad{background:var(--bad)}
+[dir=rtl] .flip svg{transform:scaleX(-1)}
+@media(max-width:360px){.wgrid,.qgrid{gap:8px}.brand b{font-size:16px}.chips2 button{flex-basis:100%}}
+@media(min-width:600px){main{max-width:760px;padding-left:24px;padding-right:24px}.wgrid{grid-template-columns:repeat(4,1fr)}.qgrid{grid-template-columns:repeat(3,1fr)}.sheet{align-items:center}.sheet>div{border-radius:28px;max-width:460px}}
+@media(min-width:900px){main{max-width:1120px;padding-bottom:40px}.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;align-items:start}.cols>div+div{position:sticky;top:76px;max-height:calc(100vh - 100px);overflow:auto}
+#nv{position:sticky;top:8px;bottom:auto;left:auto;right:auto;max-width:none;margin:6px 0 10px}#more{max-width:900px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head><body><main id="app"><p style="padding:48px 20px;color:#889;font:17px system-ui">Loading…</p></main>
-<div class="sheet" id="sh"><div><b id="st"></b><input id="amt" inputmode="decimal" placeholder="0"><input id="cat" placeholder="Category" hidden><select id="wl"></select><select id="wl2"></select><input id="nt" placeholder="Note (optional)"><label class="qrow" id="qrow" hidden><input type="checkbox" id="qa"><span>Add to Quick Purchases</span></label><input id="qp" inputmode="decimal" placeholder="Default price" hidden><button class="btn" id="sv">Save</button><button class="btn alt" onclick="sh.classList.remove('on')">Cancel</button></div></div>
+<div class="sheet" id="sh" role="dialog" aria-modal="true" aria-labelledby="st"><div><b id="st"></b><small class="lb">Amount</small><input id="amt" inputmode="decimal" placeholder="0" aria-label="Amount"><input id="cat" placeholder="Category" hidden><small class="lb">Wallet</small><select id="wl" aria-label="Wallet"></select><select id="wl2" aria-label="To wallet"></select><small class="lb" id="ntl">Description</small><input id="nt" placeholder="Note (optional)"><label class="qrow" id="qrow" hidden><input type="checkbox" id="qa"><span>Add to Quick Purchases</span></label><small class="lb" id="qpl" hidden>Quick Purchase default price</small><input id="qp" inputmode="decimal" placeholder="Default price" hidden><button class="btn" id="sv">Save</button><button class="btn alt" id="qo" hidden>Add to Quick Purchases Only</button><button class="btn alt" onclick="sh.classList.remove('on')">Cancel</button></div></div>
 <script src="config.js"></script>
 <script src="core.js"></script>
 <script type="text/plain" id="appjs">
@@ -59,7 +94,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 let wallets=[],hh=null,items=[],txs=[],sum={},edit=false,ch=null,status='';
 let me=null,Qo=null,authLost=false,loggingOut=false;const Q=()=>Qo?Qo.all():[];
 
-sb.auth.onAuthStateChange(e=>{ if(e==='PASSWORD_RECOVERY'){const p=prompt('New password (min 6 characters)');if(p)sb.auth.updateUser({password:p}).then(({error})=>alert(error?error.message:'Password updated'))}
+sb.auth.onAuthStateChange(e=>{ if(e==='PASSWORD_RECOVERY'){const p=prompt('New password (min 6 characters)');if(p)sb.auth.updateUser({password:p}).then(({error})=>notify(error?error.message:'Password updated'))}
   if(e==='SIGNED_OUT'&&me&&!loggingOut){me=null;Qo=null;authView('Your session expired. Log in again. Your unsynced entries are kept on this device.')} });
 function adoptLegacy(){const raw=LS.getItem('ht_q');if(!raw)return;let old=[];try{old=JSON.parse(raw)}catch(e){}
   const ins=old.filter(o=>!o.op&&o.household_id&&o.client_id),ops=old.filter(o=>o.op);
@@ -106,12 +141,18 @@ function setupView(){
   $('#jn').onclick=()=>go('join_household',{code:$('#cd').value});
 }
 async function dashView(){
-  app.innerHTML=`<nav id="nv"><button data-n="home" class="on">Home</button><button data-n="daily">Daily</button><button data-n="stats">Stats</button><button data-n="hist">History</button></nav><div id="home"><div class="bar"><span id="net"><i class="dot"></i><span id="ns"></span></span><span><button class="link" id="inv">Invite code: ${esc(hh.invite_code)}</button> · <button class="link" id="hm">Household</button> · <button class="link" id="lo">Log out</button> · <button class="link" onclick="setLang()">العربية / EN</button></span></div>
-  <div id="syb" class="syb" hidden></div><div class="cols"><div><div class="hero"><small>Total balance</small><div class="bal" id="bal">…</div><div class="row"><div><small>Today</small><b id="s1"></b></div><div><small>This week</small><b id="s2"></b></div><div><small>This month</small><b id="s3"></b></div></div></div>
-  <div class="kp" id="wb" style="margin-top:12px"></div><div class="grid"><button class="tile big" data-t="withdraw">Withdraw cash<span>Bank → household cash</span></button><button class="tile inc" data-t="income">Add income</button></div>
-  <h2>Quick purchases ${''}<button class="link" id="ed"></button></h2><div class="grid" id="qi"></div>
-  <div class="grid"><button class="tile" data-t="expense">Custom expense</button><button class="tile" data-t="deposit">Cash back to bank</button><button class="tile" data-t="transfer">Transfer</button></div>
-  </div><div><h2>Recent</h2><div id="tl"></div></div></div></div><div id="more" hidden></div>`;
+  app.innerHTML=`<nav id="nv" aria-label="Main"><button data-n="home" class="on">${svg('home')}<span>Home</span></button><button data-n="daily">${svg('calendar')}<span>Daily</span></button><button data-n="stats">${svg('chart')}<span>Stats</span></button><button data-n="hist">${svg('list')}<span>History</span></button></nav><div id="home">
+  <header class="top"><div class="brand"><span class="logo">${svg('home')}</span><b>Household Tracker</b></div><div class="tools"><span class="st"><span id="net"><i class="dot"></i><span id="ns"></span></span></span><button class="ic" id="gear" aria-label="Settings" aria-expanded="false">${svg('gear')}</button></div></header>
+  <div id="menu" class="menu" hidden><button class="mi" id="inv">Invite code: ${esc(hh.invite_code)}</button><button class="mi" id="hm">Household</button><button class="mi" onclick="setLang()">العربية / EN</button><button class="mi" id="ac">Account</button><button class="mi dg" id="lo">Log out</button></div>
+  <div id="syb" class="syb" hidden></div><div class="cols"><div>
+  <section class="hero"><div class="ht"><small>Total balance</small><button class="pill" id="per" aria-label="Change period"></button></div><div class="bal" id="bal">…</div><div class="spent"><small>Spent</small><b id="pv"></b></div><div class="row"><div><small>Today</small><b id="s1"></b></div><div><small>This week</small><b id="s2"></b></div><div><small>This month</small><b id="s3"></b></div></div></section>
+  <div class="wgrid"><div id="wb"></div><button class="wc act" data-t="withdraw"><span class="wi">${svg('wallet')}</span><small>Withdraw cash</small><b>Bank → household cash</b><span class="go flip">${svg('go')}</span></button></div>
+  <button class="cta" data-t="income"><span class="pl">${svg('plus')}</span>Add income</button>
+  <div class="chips2"><button data-t="expense">Custom expense</button><button data-t="deposit">Cash back to bank</button><button data-t="transfer">Transfer</button></div>
+  <div class="sec"><h2>Quick purchases</h2><button class="link" id="ed"></button></div><div class="qgrid" id="qi"></div>
+  </div><div><div class="sec"><h2>Recent</h2><button class="link" id="va">View all</button></div><div id="tl"></div></div></div></div><div id="more" hidden></div>`;
+  {const m=$('#menu'),g=$('#gear');g.onclick=e=>{e.stopPropagation();m.hidden=!m.hidden;g.setAttribute('aria-expanded',String(!m.hidden))};m.onclick=e=>{if(e.target.closest('button'))m.hidden=true};if(!window._mc){window._mc=1;document.addEventListener('click',()=>{const x=$('#menu');if(x)x.hidden=true})}}
+  $('#per').onclick=()=>{const o=['today','week','month'];LS.setItem('ht_per',o[(o.indexOf(LS.getItem('ht_per')||'month')+1)%3]);paint()};$('#va').onclick=()=>tab('hist');$('#ac').onclick=()=>tab('account');
   $('#lo').onclick=()=>{const n=Q().filter(o=>o.state==='pending').length;if(n&&!confirm(T('You have unsynced entries. They stay on this device and sync the next time this account logs in. Log out anyway?')))return;loggingOut=true;sb.auth.signOut().then(()=>{hh=null;me=null;Qo=null;LS.removeItem('ht_hh');LS.removeItem('ht_c');boot()})};
   $('#inv').onclick=()=>{const t=`Join our household in Household Tracker with code: ${hh.invite_code}\n${location.origin+location.pathname}`;navigator.share?navigator.share({text:t}):prompt('Send this to your family:',t)};
   $('#ed').onclick=()=>{edit=!edit;paint()};document.querySelectorAll('#nv button').forEach(b=>b.onclick=()=>tab(b.dataset.n));$('#hm').onclick=()=>tab('house');
@@ -121,7 +162,7 @@ async function dashView(){
   ch=sb.channel('tx-'+hh.id).on('postgres_changes',{...F0,event:'INSERT',filter:fl},loadSoon).on('postgres_changes',{...F0,event:'UPDATE',filter:fl},loadSoon).on('postgres_changes',{...F0,event:'DELETE'},loadSoon).on('postgres_changes',{event:'DELETE',schema:'public',table:'members'},p=>{if(p.old&&p.old.user_id===me)lostAccess()}).subscribe(st=>{if(st==='SUBSCRIBED')loadSoon()});
   {const c=JSON.parse(LS.getItem('ht_c')||'null');if(c){({sum,items,txs,wallets}=c);paint()}}await load();flush();
 }
-let warned=false;const warnStore=()=>{if(LS.failed&&!warned){warned=true;alert(T('Your browser could not save data on this device. Entries may be lost if you close the app. Free some space or leave private mode.'))}};
+let warned=false;const warnStore=()=>{if(LS.failed&&!warned){warned=true;notify(T('Your browser could not save data on this device. Entries may be lost if you close the app. Free some space or leave private mode.'))}};
 let lt;const loadSoon=()=>{clearTimeout(lt);lt=setTimeout(load,250)};
 function netPaint(){const n=$('#net');if(!n)return;const all=Q(),q=all.filter(o=>o.state==='pending').length,bad=all.filter(o=>o.state==='failed'||o.state==='conflict').length;
   const s=!navigator.onLine?'off':q?'sync':'';n.className=s;$('#ns').textContent=s==='off'?`Offline${q?` · ${q} waiting`:''}`:q?`Syncing ${q}…`:'Online';
@@ -144,16 +185,16 @@ function paint(){
   const q=Q(),P=Core.balances(wallets,q,(wallets[0]||{}).id),SP=Core.spendDeltas(q,Date.now());
   $('#bal').textContent=fmt(wallets.length?P.total:(sum.balance||0));
   $('#s1').textContent=fmt((sum.today||0)+SP.today);$('#s2').textContent=fmt((sum.week||0)+SP.week);$('#s3').textContent=fmt((sum.month||0)+SP.month);
-  $('#ed').textContent=edit?'Done':'Edit prices';$('#wb').innerHTML=wallets.map(w=>`<div><small>${esc(w.name)}</small><b>${fmt(P.wallets[w.id])}</b></div>`).join('');
-  const qiAll=[...items,...q.filter(o=>o.op==='qi'&&o.state==='pending'&&!items.some(i=>i.name.toLowerCase()===o.name.toLowerCase())).map(o=>({id:'p'+o.qid,name:o.name,default_price:o.price,pending:1}))];
-  $('#qi').innerHTML=qiAll.map(i=>`<button class="tile" data-i="${i.id}">${esc(i.name)}<span>${fmt(i.default_price)}</span></button>`).join('');
-  document.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const it=qiAll.find(x=>x.id===b.dataset.i);if(!it)return;
+  $('#ed').textContent=edit?'Done':'Edit prices';const pr=LS.getItem('ht_per')||'month',PLb={today:'Today',week:'This week',month:'This month'};$('#per').textContent=T(PLb[pr])+' ▾';$('#pv').textContent=({today:$('#s1'),week:$('#s2'),month:$('#s3')})[pr].textContent;$('#wb').innerHTML=wallets.map(w=>`<div class="wc"><span class="wi">${svg(wicon(w.name))}</span><small>${esc(w.name)}</small><b>${fmt(P.wallets[w.id])}</b></div>`).join('');
+  const qiAll=[...items.map(i=>{const p=q.find(o=>o.op==='qi'&&o.state==='pending'&&o.name.toLowerCase()===i.name.toLowerCase());return p?{...i,default_price:p.price}:i}),...q.filter(o=>o.op==='qi'&&o.state==='pending'&&!items.some(i=>i.name.toLowerCase()===o.name.toLowerCase())).map(o=>({id:'p'+o.qid,name:o.name,default_price:o.price,pending:1}))];
+  $('#qi').innerHTML=qiAll.map(i=>`<button class="qc" data-i="${i.id}"><span class="qe">${Core.qicon(i.name)}</span><span><b>${esc(i.name)}</b><small>${fmt(i.default_price)}</small></span></button>`).join('');
+  $('#qi').querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const it=qiAll.find(x=>x.id===b.dataset.i);if(!it)return;
     if(edit){if(it.pending)return;const p=prompt(`Default price for ${it.name}`,it.default_price);if(p!==null&&p!==''&&num(p)>=0)sb.from('quick_items').update({default_price:Math.round(num(p)*100)/100}).eq('id',it.id).then(load)}
     else openSheet('expense',it.name,it.default_price)});
   const mine=q.filter(r=>!r.op&&r.state!=='conflict'&&r.household_id===hh.id).map(r=>({...r,id:r.client_id,pending:1,profiles:{name:'You'}}));
-  $('#tl').innerHTML=[...mine,...txs].map(t=>trow(t,1)).join('')||'<p style="color:var(--mut)">No transactions yet. Withdraw cash to start.</p>';
-  document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const x=txs.find(y=>y.id===b.dataset.d);x&&confirm(T('Delete this transaction?'))&&queueOp({op:'del',id:x.id,old:x})});
-  document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const x=txs.find(y=>y.id===b.dataset.e);x&&openSheet(x.type,'','',x)});
+  $('#tl').innerHTML=[...mine,...txs].slice(0,5).map(t=>trow(t,1)).join('')||'<p style="color:var(--mut)">No transactions yet. Withdraw cash to start.</p>';
+  $('#tl').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const x=txs.find(y=>y.id===b.dataset.d);x&&confirm(T('Delete this transaction?'))&&queueOp({op:'del',id:x.id,old:x})});
+  $('#tl').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const x=txs.find(y=>y.id===b.dataset.e);x&&openSheet(x.type,'','',x)});
   netPaint();
 }
 const LBL={transfer:'Transfer',withdraw:'Withdraw cash',income:'Add income',expense:'Expense',deposit:'Cash back to bank'};
@@ -161,20 +202,26 @@ function openSheet(type,cat='',price='',tx=null){
   const mv=MV.includes(type);
   $('#st').textContent=tx?T('Edit')+' · '+(tx.category||tx.type):(cat||LBL[type]);
   $('#amt').value=tx?tx.amount:price;$('#nt').value=tx?(tx.note||''):'';$('#cat').hidden=!tx;$('#cat').value=tx?(tx.category||''):'';sh.classList.add('on');
-  $('#wl').innerHTML=wallets.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');$('#wl2').innerHTML=wallets.map(w=>`<option value="${w.id}">→ ${esc(w.name)}</option>`).join('');
+  $('#wl').innerHTML=wallets.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');$('#wl2').innerHTML=wallets.map(w=>`<option value="${w.id}">${ARW} ${esc(w.name)}</option>`).join('');
   $('#wl').hidden=!wallets.length;$('#wl2').hidden=!mv;
   if(tx){$('#wl').value=tx.wallet_id||'';if(mv)$('#wl2').value=tx.to_wallet_id||''}
   else if(mv){const bk=(wallets.find(w=>w.name==='Bank account')||wallets[1]||{}).id,cs=(wallets[0]||{}).id,pc=(wallets[2]||wallets[1]||{}).id;
     const [a,b]=type==='withdraw'?[bk,cs]:type==='deposit'?[cs,bk]:[cs,pc];if(a)$('#wl').value=a;if(b)$('#wl2').value=b}
   $('#nt').placeholder=type==='expense'&&!cat&&!tx?'What was it?':'Note (optional)';
-  const custom=type==='expense'&&!cat&&!tx;$('#qrow').hidden=!custom;$('#qa').checked=false;$('#qp').hidden=true;$('#qp').value='';$('#qa').onchange=()=>{$('#qp').hidden=!$('#qa').checked;if($('#qa').checked&&!$('#qp').value)$('#qp').value=$('#amt').value};
+  const custom=type==='expense'&&!cat&&!tx;$('#qrow').hidden=!custom;$('#qa').checked=false;$('#qp').hidden=true;$('#qpl').hidden=true;$('#qo').hidden=true;$('#qp').value='';$('#sv').textContent=T('Save');$('#ntl').textContent=type==='expense'?'Description':'Note';
+  $('#qa').onchange=()=>{const on=$('#qa').checked;$('#qp').hidden=!on;$('#qpl').hidden=!on;$('#qo').hidden=!on;$('#sv').textContent=T(on?'Save Expense + Add to Quick Purchases':'Save');if(on&&!$('#qp').value)$('#qp').value=$('#amt').value};
+  const quickOnly=()=>{const name=$('#nt').value.trim().slice(0,40),price=Math.round(num($('#qp').value)*100)/100;
+    if(!name){notify(T('Enter the item name'));return $('#nt').focus()}
+    if(!(price>0&&price<1e9)){notify(T('Enter a default price'));return $('#qp').focus()}
+    Qo.push({op:'qi',household_id:hh.id,name,price});warnStore();sh.classList.remove('on');paint();flush();notify(T('Added to Quick Purchases'))};
+  $('#qo').onclick=quickOnly;
   setTimeout(()=>{$('#amt').focus();$('#amt').select()},60);
-  $('#sv').onclick=()=>{const a=Math.round(num($('#amt').value)*100)/100;if(!(a>0&&a<1e9))return $('#amt').focus();
+  $('#sv').onclick=()=>{if(custom&&$('#qa').checked&&!(num($('#amt').value)>0))return quickOnly();const a=Math.round(num($('#amt').value)*100)/100;if(!(a>0&&a<1e9))return $('#amt').focus();
     const note=$('#nt').value.trim(),w1=$('#wl').value||null,w2=mv?$('#wl2').value:null;
-    if(w2&&w1===w2)return alert(T('Choose two different wallets'));
+    if(w2&&w1===w2)return notify(T('Choose two different wallets'));
     if(tx){queueOp({op:'upd',id:tx.id,base:tx.updated_at,old:tx,patch:{amount:a,category:$('#cat').value.trim()||tx.category,note,wallet_id:w1,to_wallet_id:w2}});sh.classList.remove('on');return}
     const src=(type==='expense'||w2)?w1:null;
-    if(src){const have=bal()[src]||0;if(have<a){const msg=T('Insufficient funds. Available balance')+': '+fmt(have);if(navigator.onLine)return alert(msg);if(!confirm(msg+'\n'+T('It will be checked again when you reconnect. Save anyway?')))return}}
+    if(src){const have=bal()[src]||0;if(have<a){const msg=T('Insufficient funds. Available balance')+': '+fmt(have);if(navigator.onLine)return notify(msg);if(!confirm(msg+'\n'+T('It will be checked again when you reconnect. Save anyway?')))return}}
     const qadd=custom&&$('#qa').checked;if(qadd&&!note)return $('#nt').focus();
     const c=cat||(type==='expense'?note||'Expense':LBL[type]);
     const cid=uuid();Qo.push({client_id:cid,household_id:hh.id,wallet_id:w1,to_wallet_id:w2,type,amount:a,category:c,note:cat?note:'',created_at:new Date().toISOString()});
@@ -183,9 +230,9 @@ function openSheet(type,cat='',price='',tx=null){
 }
 function queueOp(o){o.household_id=hh.id;Qo.push(o);
   txs=o.op==='del'?txs.filter(x=>x.id!==o.id):txs.map(x=>x.id===o.id?{...x,...o.patch}:x);
-  LS.setItem('ht_c',JSON.stringify({sum,items,txs,wallets}));warnStore();paint();flush()}
+  LS.setItem('ht_c',JSON.stringify({sum,items,txs,wallets}));warnStore();paint();return flush().then(()=>{if(window.histRefresh&&$('#hl'))window.histRefresh(true)})}
 async function exec(o){
-  if(o.op==='qi'){const x=await sb.rpc('add_quick_item',{h:o.household_id,n:o.name,p:o.price});return{error:x.error,status:x.status}}
+  if(o.op==='qi'){const x=await sb.rpc('upsert_quick_item',{h:o.household_id,n:o.name,p:o.price});return{error:x.error,status:x.status}}
   if(o.op==='del'){const x=await sb.from('transactions').delete().eq('id',o.id).select('id');if(x.error)return{error:x.error,status:x.status};
     if(!x.data.length){const e=await sb.from('transactions').select('id').eq('id',o.id);if(e.data&&e.data.length)return{conflict:true,message:'You are not allowed to delete this entry.'}}
     return{}}
@@ -195,12 +242,13 @@ async function exec(o){
     return{updated_at:x.data[0].updated_at}}
   const row={client_id:o.client_id,household_id:o.household_id,user_id:o.uid,wallet_id:o.wallet_id,to_wallet_id:o.to_wallet_id,type:o.type,amount:o.amount,category:o.category,note:o.note,created_at:o.created_at};
   const x=await sb.from('transactions').upsert(row,{onConflict:'client_id',ignoreDuplicates:true});return{error:x.error,status:x.status}}
-let busy=false;
+let busy=false,again=false;
 async function flush(){
-  if(busy||!Qo||!navigator.onLine)return netPaint();busy=true;let r={};
+  if(busy){again=true;return}if(!Qo||!navigator.onLine)return netPaint();busy=true;let r={};
   try{r=await Core.sync(Qo,me,{online:()=>navigator.onLine,sessionUid:async()=>{const{data}=await sb.auth.getSession();return data&&data.session?data.session.user.id:null},exec});authLost=r.stopped==='auth'}
   finally{busy=false}
-  await load();(r.errors||[]).forEach(m=>alert(T('Could not save')+': '+m));if(r.conflict)alert(T('This entry was changed on another device. Your edit was not applied. The latest version is now shown.'));
+  await load();(r.errors||[]).forEach(m=>notify(T('Could not save')+': '+m));if(r.conflict)notify(T('This entry was changed on another device. Your edit was not applied. The latest version is now shown.'));
+  if(again){again=false;return flush()}
 }
 function syncView(){const v=$('#more'),L=Q().filter(o=>o.state==='failed'||o.state==='conflict');
   v.innerHTML='<h2>Needs attention</h2>'+(L.map(o=>`<div class="tx"><div><b>${esc(o.op?(o.op==='del'?'Delete':'Edit'):(o.category||o.type))} ${o.amount?fmt(o.amount):''}</b><br><small>${esc(o.state)}: ${esc(o.err)}</small></div><div>${o.state==='failed'?`<button class="link" data-retry="${o.qid}">Retry</button> · `:''}<button class="link" data-discard="${o.qid}">Discard</button></div></div>`).join('')||'<p style="color:var(--mut)">All synced.</p>');
@@ -213,12 +261,13 @@ addEventListener('online',()=>flush());addEventListener('offline',()=>netPaint()
 /* ---- Batch 1: Daily summary, Stats, History ---- */
 const day=d=>Core.cairoYmd(d);
 const need=()=>'<p style="color:var(--mut)">This screen needs an internet connection.</p>';
-const bars=r=>{const m=Math.max(...r.map(x=>+x.total),1);return r.map(x=>`<div class="bi"><div class="bl"><span>${esc(x.name)} · ${x.n}×</span><b>${fmt(x.total)}</b></div><div class="bt"><i style="width:${x.total/m*100}%"></i></div></div>`).join('')||'<p style="color:var(--mut)">Nothing yet.</p>'};
+const bars=r=>{const m=Math.max(...r.map(x=>+x.total),1);return r.map(x=>`<div class="bi"><div class="bl"><span>${esc(x.name)}${x.n!=null?' · '+x.n+'×':''}</span><b>${fmt(x.total)}</b></div><div class="bt"><i style="width:${x.total/m*100}%"></i></div></div>`).join('')||'<p style="color:var(--mut)">Nothing yet.</p>'};
 const WI=n=>/bank/i.test(n)?'🏦':/personal/i.test(n)?'👤':/cash/i.test(n)?'💵':'👛';
 const wlab=id=>{const n=wn(id);return n?WI(n)+' '+esc(n):''};
 const TL={expense:'Expense',income:'Income',withdraw:'Withdraw',deposit:'Deposit',transfer:'Transfer'};
-const trow=(t,ctl)=>`<div class="tx"><div><b>${esc(t.category||t.type)}</b><br><small>${esc(t.profiles?.name||t.pname||'')} · ${TL[t.type]||''} · ${new Date(t.created_at).toLocaleString((LG==='ar'?'ar-EG':'en-GB'),{timeZone:'Africa/Cairo',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${t.pending?(t.state==='failed'?' · NOT SYNCED':' · waiting to sync'):''}${t.note?' · '+esc(t.note):''}</small><br><small class="wl">${t.to_wallet_id?wlab(t.wallet_id)+' → '+wlab(t.to_wallet_id):wlab(t.wallet_id)}</small></div><div><span class="amt ${t.type==='income'?'pos':t.type==='expense'?'neg':''}" ${ctl&&!t.pending?`data-e="${t.id}"`:''}>${t.type==='income'?'+':t.type==='expense'?'−':'⇄ '}${fmt(t.amount)}</span>${ctl&&!t.pending?`<button class="x" data-d="${t.id}">×</button>`:''}</div></div>`;
-function tab(n){document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.n===n));$('#home').hidden=n!=='home';$('#more').hidden=n==='home';if(n!=='home')({daily:dailyView,stats:statsView,hist:histView,sync:syncView,house:houseView})[n]();scrollTo(0,0)}
+const TI={income:['down','pos'],expense:['up','neg'],withdraw:['swap',''],deposit:['swap',''],transfer:['swap','']};
+const trow=(t,ctl)=>{const [ic,cl]=TI[t.type]||['swap',''];return `<div class="tx"><span class="ti ${cl}">${svg(ic)}</span><div class="tm"><b>${esc(t.category||t.type)}</b><small>${esc(t.profiles?.name||t.pname||(t.pending?'':T('Deleted user')))} · ${TL[t.type]||''} · ${new Date(t.created_at).toLocaleString((LG==='ar'?'ar-EG':'en-GB'),{timeZone:'Africa/Cairo',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${t.pending?(t.state==='failed'?' · NOT SYNCED':' · waiting to sync'):''}${t.note?' · '+esc(t.note):''}</small><small class="wl">${t.to_wallet_id?wlab(t.wallet_id)+' '+ARW+' '+wlab(t.to_wallet_id):wlab(t.wallet_id)}</small></div><div class="ta"><span class="amt ${t.type==='income'?'pos':t.type==='expense'?'neg':''}" ${ctl&&!t.pending?`data-e="${t.id}"`:''}>${t.type==='income'?'+':t.type==='expense'?'−':'⇄ '}${fmt(t.amount)}</span>${ctl&&!t.pending?`<button class="x" data-d="${t.id}" aria-label="Delete">×</button>`:''}</div></div>`};
+function tab(n){document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.n===n));$('#home').hidden=n!=='home';$('#more').hidden=n==='home';if(n!=='home')({daily:dailyView,stats:statsView,hist:histView,sync:syncView,house:houseView,account:accountView})[n]();scrollTo(0,0)}
 
 let dd=day(new Date());
 async function dailyView(){
@@ -227,8 +276,8 @@ async function dailyView(){
   const [r,l]=await Promise.all([sb.rpc('range_stats',{h:hh.id,d1:dd,d2:dd}),sb.from('transactions').select('*,profiles(name)').eq('household_id',hh.id).eq('type','expense').gte('created_at',a).lt('created_at',b).order('created_at',{ascending:false})]);
   const s=r.data||{by_member:[],top:[]},top=s.top[0];
   v.innerHTML=`<div class="dn"><button id="pv">${LG==='ar'?'›':'‹'}</button><input id="dp" type="date" value="${dd}" style="width:auto"><button id="nx">${LG==='ar'?'‹':'›'}</button></div>
-  <div class="hero" style="margin:12px 0"><small>Household spending</small><div class="bal">${fmt(s.expenses)}</div><small>${s.count||0} purchases${top?` · biggest: ${esc(top.category)} ${fmt(top.amount)}`:''}</small></div>
-  <h2>By person</h2>${bars(s.by_member)}<h2>Purchases</h2>${(l.data||[]).map(t=>trow(t)).join('')||'<p style="color:var(--mut)">No purchases on this day.</p>'}`;
+  <div class="hero" style="margin:12px 0"><small>Household spending</small><div class="bal">${fmt(s.expenses)}</div><small>${s.count||0} purchases · ${T('Income')} ${fmt(s.income||0)}${top?` · biggest: ${esc(top.category)} ${fmt(top.amount)}`:''}</small></div>
+  <h2>By person</h2>${bars(s.by_member)}<h2>By wallet</h2>${bars(byWallet(l.data||[]))}<h2>Purchases</h2>${(l.data||[]).map(t=>trow(t)).join('')||'<p style="color:var(--mut)">No purchases on this day.</p>'}`;
   const go=x=>{dd=x;dailyView()};
   $('#pv').onclick=()=>go(Core.addDays(dd,-1));$('#nx').onclick=()=>go(Core.addDays(dd,1));$('#dp').onchange=e=>e.target.value&&go(e.target.value);
 }
@@ -243,9 +292,9 @@ async function statsView(){
   ${sr==='custom'?`<div class="row"><input id="c1" type="date" value="${cf}"><input id="c2" type="date" value="${ct}"></div>`:''}
   <div class="kp"><div><small>Spent</small><b class="neg">${fmt(s.expenses)}</b></div><div><small>Income</small><b class="pos">${fmt(s.income)}</b></div></div>
   <h2>Spending per day</h2><div class="dc">${s.daily.map(x=>`<i title="${x.d}" style="height:${x.total/mx*100}%"></i>`).join('')||'<small>No spending in this range.</small>'}</div>
-  <h2>By category</h2>${bars(s.by_cat)}<h2>By person</h2>${bars(s.by_member)}
+  <h2>By category</h2>${bars(s.by_cat)}<h2>By person</h2>${bars(s.by_member)}<h2>Wallets</h2>${bars(walletRows())}
   <h2>Most bought</h2>${freq.map(x=>`<div class="bl"><span>${esc(x.name)}</span><b>${x.n}×</b></div>`).join('')||'<small>Nothing yet.</small>'}
-  <h2>Biggest purchases</h2>${s.top.map(x=>`<div class="tx"><div><b>${esc(x.category)}</b><br><small>${esc(x.pname)} · ${new Date(x.created_at).toLocaleDateString((LG==='ar'?'ar-EG':'en-GB'),{timeZone:'Africa/Cairo'})}</small><br><small class="wl">${x.wname?WI(x.wname)+' '+esc(x.wname):''}</small></div><span class="amt neg">${fmt(x.amount)}</span></div>`).join('')||'<small>Nothing yet.</small>'}`;
+  <h2>Biggest purchases</h2>${s.top.map(x=>`<div class="tx"><div><b>${esc(x.category)}</b><br><small>${esc(x.pname||T('Deleted user'))} · ${new Date(x.created_at).toLocaleDateString((LG==='ar'?'ar-EG':'en-GB'),{timeZone:'Africa/Cairo'})}</small><br><small class="wl">${x.wname?WI(x.wname)+' '+esc(x.wname):''}</small></div><span class="amt neg">${fmt(x.amount)}</span></div>`).join('')||'<small>Nothing yet.</small>'}`;
   document.querySelectorAll('[data-r]').forEach(x=>x.onclick=()=>{sr=x.dataset.r;statsView()});
   if(sr==='custom'){$('#c1').onchange=e=>{cf=e.target.value||cf;statsView()};$('#c2').onchange=e=>{ct=e.target.value||ct;statsView()}}
 }
@@ -269,15 +318,17 @@ async function histView(){
     const {data,error}=await q.order(col,{ascending:dir==='asc'}).order('id').range(from,from+PAGE-1);
     if(error)return $('#hl').innerHTML=`<p class="err">${esc(error.message)}</p>`;
     hrows=reset?data:[...hrows,...data];
-    $('#hl').innerHTML=(hrows.map(t=>trow(t)).join('')||'<p style="color:var(--mut)">No matching transactions.</p>')+(data.length===PAGE?'<button class="btn alt" id="lm">Load more</button>':'');
-    if($('#lm'))$('#lm').onclick=()=>run(false);
+    $('#hl').innerHTML=(hrows.map(t=>trow(t,1)).join('')||'<p style="color:var(--mut)">No matching transactions.</p>')+(data.length===PAGE?'<button class="btn alt" id="lm">Load more</button>':'');
+    $('#hl').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const x=hrows.find(y=>y.id===b.dataset.d);x&&confirm(T('Delete this transaction?'))&&queueOp({op:'del',id:x.id,old:x})});
+    $('#hl').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const x=hrows.find(y=>y.id===b.dataset.e);x&&openSheet(x.type,'','',x)});
+    window.histRefresh=run;if($('#lm'))$('#lm').onclick=()=>run(false);
   };
   [['fq','q'],['fa','a'],['fb','b'],['fc','c'],['fm','m'],['fs','s']].forEach(([id,k])=>$('#'+id).oninput=e=>{F[k]=e.target.value;run(true)});
   run();
 }
 
 
-const AR={"Household":"الأسرة","Members":"الأعضاء","Member":"عضو","Owner":"المالك","Remove member":"إزالة عضو","Delete Household":"حذف الأسرة","Danger zone":"منطقة الخطر","Add to Quick Purchases":"إضافة إلى المشتريات السريعة","Default price":"السعر الافتراضي","Withdraw":"سحب","Deposit":"إيداع","Could not save":"تعذر الحفظ","Insufficient funds. Available balance":"الرصيد غير كافٍ. الرصيد المتاح","It will be checked again when you reconnect. Save anyway?":"سيتم التحقق مرة أخرى عند عودة الاتصال. هل تريد الحفظ؟","You no longer have access to this household.":"لم يعد لديك صلاحية الوصول إلى هذه الأسرة.","Household deleted.":"تم حذف الأسرة.","They lose access immediately. Their account and past transactions are kept.":"يفقد الوصول فوراً. يبقى حسابه ومعاملاته السابقة.","Type the household name to confirm":"اكتب اسم الأسرة للتأكيد","Delete this household? This removes the household and removes ALL members from it. Wallets, transactions and quick purchases are deleted. This cannot be undone. Your account is kept.":"حذف هذه الأسرة؟ سيتم حذف الأسرة وإزالة جميع الأعضاء منها مع المحافظ والمعاملات والمشتريات السريعة. لا يمكن التراجع. يبقى حسابك.","Needs attention":"تحتاج إلى انتباه","Retry":"إعادة المحاولة","Discard":"تجاهل","Load more":"تحميل المزيد","Category":"الفئة","Edit":"تعديل","All synced.":"تمت مزامنة كل شيء.","NOT SYNCED":"لم تتم المزامنة","Discard this entry? A copy is kept on this device.":"تجاهل هذا الإدخال؟ تبقى نسخة منه على هذا الجهاز.","This entry was changed on another device. Your edit was not applied. The latest version is now shown.":"تم تعديل هذا الإدخال من جهاز آخر. لم يتم تطبيق تعديلك. يتم عرض آخر نسخة الآن.","Can't reach the server":"تعذر الوصول إلى الخادم","Try again":"حاول مرة أخرى","Private mode detected: you will be logged out every time. Open the site in a normal tab.":"الوضع الخاص مفعّل: سيتم تسجيل خروجك في كل مرة. افتح الموقع في تبويب عادي.","Not enough in this wallet. Save anyway?":"الرصيد في هذه المحفظة لا يكفي. هل تريد الحفظ على أي حال؟","Household Tracker": "متتبع المنزل", "Every purchase, one tap.": "كل مشترياتك بنقرة واحدة.", "Your name (new accounts)": "اسمك (للحسابات الجديدة)", "Email": "البريد الإلكتروني", "Password": "كلمة المرور", "Log in": "تسجيل الدخول", "Create account": "إنشاء حساب", "Forgot password?": "نسيت كلمة المرور؟", "Check your email to confirm, then log in.": "تحقق من بريدك للتأكيد ثم سجل الدخول.", "Reset link sent to your email.": "أُرسل رابط الاستعادة إلى بريدك.", "Your household": "أسرتك", "Start a new one, or join with a code.": "أنشئ أسرة جديدة أو انضم برمز.", "Household name": "اسم الأسرة", "Create household": "إنشاء أسرة", "Invitation code": "رمز الدعوة", "Join household": "الانضمام للأسرة", "Log out": "تسجيل الخروج", "Invite code:": "رمز الدعوة:", "Online": "متصل", "Offline": "غير متصل", "waiting to sync": "بانتظار المزامنة", "waiting": "بالانتظار", "Syncing": "مزامنة", "Total balance": "الرصيد الإجمالي", "Today": "اليوم", "This week": "هذا الأسبوع", "This month": "هذا الشهر", "Withdraw cash": "سحب نقدي", "Bank → household cash": "من البنك إلى النقدية", "Add income": "إضافة دخل", "Quick purchases": "مشتريات سريعة", "Edit prices": "تعديل الأسعار", "Done": "تم", "Custom expense": "مصروف آخر", "Cash back to bank": "إيداع في البنك", "Recent": "الأخيرة", "Transfer": "تحويل", "Home": "الرئيسية", "Daily": "اليومي", "Stats": "الإحصاءات", "History": "السجل", "Save": "حفظ", "Cancel": "إلغاء", "Note (optional)": "ملاحظة (اختياري)", "What was it?": "ما هو؟", "Expense": "مصروف", "Bread": "عيش", "Fish": "سمك", "Chicken": "فراخ", "Meat": "لحمة", "Rice": "أرز", "Vegetables": "خضار", "Fruits": "فاكهة", "Milk": "لبن", "Eggs": "بيض", "Other groceries": "بقالة أخرى", "Household cash": "نقدية المنزل", "Bank account": "حساب بنكي", "Personal cash": "نقدية شخصية", "Spent": "المصروف", "Income": "الدخل", "Search": "بحث", "All categories": "كل الفئات", "Everyone": "الجميع", "Newest first": "الأحدث أولاً", "Oldest first": "الأقدم أولاً", "Highest amount": "الأعلى مبلغاً", "Lowest amount": "الأقل مبلغاً", "Week": "أسبوع", "Month": "شهر", "Custom": "مخصص", "Spending per day": "الصرف اليومي", "By category": "حسب الفئة", "By person": "حسب الشخص", "Most bought": "الأكثر شراءً", "Biggest purchases": "أكبر المشتريات", "Purchases": "المشتريات", "Household spending": "مصروف الأسرة", "Nothing yet.": "لا شيء بعد.", "No transactions yet. Withdraw cash to start.": "لا توجد معاملات بعد. اسحب نقداً للبدء.", "No matching transactions.": "لا توجد نتائج.", "No purchases on this day.": "لا مشتريات في هذا اليوم.", "You": "أنت", "This screen needs an internet connection.": "هذه الشاشة تحتاج إلى إنترنت.", "Delete this transaction?": "حذف هذه المعاملة؟", "New amount": "المبلغ الجديد", "Choose two different wallets": "اختر محفظتين مختلفتين", "Changed on another device. Your edit was skipped.": "تم التعديل من جهاز آخر. تم تجاهل تعديلك.", "purchases": "مشتريات", "biggest:": "الأكبر:"
+const AR={"Settings":"الإعدادات","View all":"عرض الكل","Account":"الحساب","By wallet":"حسب المحفظة","Amount":"المبلغ","Wallet":"المحفظة","Description":"الوصف","Note":"ملاحظة","Deleted user":"مستخدم محذوف","Save Expense + Add to Quick Purchases":"حفظ المصروف + إضافة للمشتريات السريعة","Add to Quick Purchases Only":"إضافة للمشتريات السريعة فقط","Quick Purchase default price":"السعر الافتراضي للمشترى السريع","Enter the item name":"أدخل اسم الصنف","Enter a default price":"أدخل السعر الافتراضي","Added to Quick Purchases":"تمت الإضافة للمشتريات السريعة","Delete your account?":"حذف حسابك؟","This permanently deletes your account and cannot be undone.":"سيتم حذف حسابك نهائياً ولا يمكن التراجع.","Delete My Account":"حذف حسابي","Type DELETE to confirm":"اكتب DELETE للتأكيد","Internet connection required to delete your account.":"يلزم اتصال بالإنترنت لحذف حسابك.","Your account was deleted.":"تم حذف حسابك.","If you own a household that still has other members, remove them or delete the household first. If you are the only member, the household is deleted with your account. Entries you added in other households stay in their history as Deleted user.":"إذا كنت تملك أسرة بها أعضاء آخرون فأزلهم أو احذف الأسرة أولاً. إذا كنت العضو الوحيد تُحذف الأسرة مع حسابك. تبقى إدخالاتك في الأسر الأخرى في السجل باسم مستخدم محذوف.","Household":"الأسرة","Members":"الأعضاء","Member":"عضو","Owner":"المالك","Remove member":"إزالة عضو","Delete Household":"حذف الأسرة","Danger zone":"منطقة الخطر","Add to Quick Purchases":"إضافة إلى المشتريات السريعة","Default price":"السعر الافتراضي","Withdraw":"سحب","Deposit":"إيداع","Could not save":"تعذر الحفظ","Insufficient funds. Available balance":"الرصيد غير كافٍ. الرصيد المتاح","It will be checked again when you reconnect. Save anyway?":"سيتم التحقق مرة أخرى عند عودة الاتصال. هل تريد الحفظ؟","You no longer have access to this household.":"لم يعد لديك صلاحية الوصول إلى هذه الأسرة.","Household deleted.":"تم حذف الأسرة.","They lose access immediately. Their account and past transactions are kept.":"يفقد الوصول فوراً. يبقى حسابه ومعاملاته السابقة.","Type the household name to confirm":"اكتب اسم الأسرة للتأكيد","Delete this household? This removes the household and removes ALL members from it. Wallets, transactions and quick purchases are deleted. This cannot be undone. Your account is kept.":"حذف هذه الأسرة؟ سيتم حذف الأسرة وإزالة جميع الأعضاء منها مع المحافظ والمعاملات والمشتريات السريعة. لا يمكن التراجع. يبقى حسابك.","Needs attention":"تحتاج إلى انتباه","Retry":"إعادة المحاولة","Discard":"تجاهل","Load more":"تحميل المزيد","Category":"الفئة","Edit":"تعديل","All synced.":"تمت مزامنة كل شيء.","NOT SYNCED":"لم تتم المزامنة","Discard this entry? A copy is kept on this device.":"تجاهل هذا الإدخال؟ تبقى نسخة منه على هذا الجهاز.","This entry was changed on another device. Your edit was not applied. The latest version is now shown.":"تم تعديل هذا الإدخال من جهاز آخر. لم يتم تطبيق تعديلك. يتم عرض آخر نسخة الآن.","Can't reach the server":"تعذر الوصول إلى الخادم","Try again":"حاول مرة أخرى","Private mode detected: you will be logged out every time. Open the site in a normal tab.":"الوضع الخاص مفعّل: سيتم تسجيل خروجك في كل مرة. افتح الموقع في تبويب عادي.","Not enough in this wallet. Save anyway?":"الرصيد في هذه المحفظة لا يكفي. هل تريد الحفظ على أي حال؟","Household Tracker": "متتبع المنزل", "Every purchase, one tap.": "كل مشترياتك بنقرة واحدة.", "Your name (new accounts)": "اسمك (للحسابات الجديدة)", "Email": "البريد الإلكتروني", "Password": "كلمة المرور", "Log in": "تسجيل الدخول", "Create account": "إنشاء حساب", "Forgot password?": "نسيت كلمة المرور؟", "Check your email to confirm, then log in.": "تحقق من بريدك للتأكيد ثم سجل الدخول.", "Reset link sent to your email.": "أُرسل رابط الاستعادة إلى بريدك.", "Your household": "أسرتك", "Start a new one, or join with a code.": "أنشئ أسرة جديدة أو انضم برمز.", "Household name": "اسم الأسرة", "Create household": "إنشاء أسرة", "Invitation code": "رمز الدعوة", "Join household": "الانضمام للأسرة", "Log out": "تسجيل الخروج", "Invite code:": "رمز الدعوة:", "Online": "متصل", "Offline": "غير متصل", "waiting to sync": "بانتظار المزامنة", "waiting": "بالانتظار", "Syncing": "مزامنة", "Total balance": "الرصيد الإجمالي", "Today": "اليوم", "This week": "هذا الأسبوع", "This month": "هذا الشهر", "Withdraw cash": "سحب نقدي", "Bank → household cash": "من البنك إلى النقدية", "Add income": "إضافة دخل", "Quick purchases": "مشتريات سريعة", "Edit prices": "تعديل الأسعار", "Done": "تم", "Custom expense": "مصروف آخر", "Cash back to bank": "إيداع في البنك", "Recent": "الأخيرة", "Transfer": "تحويل", "Home": "الرئيسية", "Daily":"اليوم", "Stats":"الإحصائيات", "History": "السجل", "Save": "حفظ", "Cancel": "إلغاء", "Note (optional)": "ملاحظة (اختياري)", "What was it?": "ما هو؟", "Expense": "مصروف", "Bread": "عيش", "Fish": "سمك", "Chicken": "فراخ", "Meat": "لحمة", "Rice": "أرز", "Vegetables": "خضار", "Fruits": "فاكهة", "Milk": "لبن", "Eggs": "بيض", "Other groceries": "بقالة أخرى", "Household cash": "نقدية المنزل", "Bank account": "حساب بنكي", "Personal cash": "نقدية شخصية", "Spent": "المصروف", "Income": "الدخل", "Search": "بحث", "All categories": "كل الفئات", "Everyone": "الجميع", "Newest first": "الأحدث أولاً", "Oldest first": "الأقدم أولاً", "Highest amount": "الأعلى مبلغاً", "Lowest amount": "الأقل مبلغاً", "Week": "أسبوع", "Month": "شهر", "Custom": "مخصص", "Spending per day": "الصرف اليومي", "By category": "حسب الفئة", "By person": "حسب الشخص", "Most bought": "الأكثر شراءً", "Biggest purchases": "أكبر المشتريات", "Purchases": "المشتريات", "Household spending": "مصروف الأسرة", "Nothing yet.": "لا شيء بعد.", "No transactions yet. Withdraw cash to start.": "لا توجد معاملات بعد. اسحب نقداً للبدء.", "No matching transactions.": "لا توجد نتائج.", "No purchases on this day.": "لا مشتريات في هذا اليوم.", "You": "أنت", "This screen needs an internet connection.": "هذه الشاشة تحتاج إلى إنترنت.", "Delete this transaction?": "حذف هذه المعاملة؟", "New amount": "المبلغ الجديد", "Choose two different wallets": "اختر محفظتين مختلفتين", "Changed on another device. Your edit was skipped.": "تم التعديل من جهاز آخر. تم تجاهل تعديلك.", "purchases": "مشتريات", "biggest:": "الأكبر:"
 ,"New here? Create account":"جديد؟ أنشئ حساباً","I already have an account":"لدي حساب بالفعل","Use your own email. Each family member needs their own account.":"استخدم بريدك الخاص. كل فرد من الأسرة يحتاج حسابه.","Your name":"اسمك","Password (6+ characters)":"كلمة المرور (6 أحرف على الأقل)","Resend confirmation email":"إعادة إرسال رسالة التأكيد","Resend in":"إعادة الإرسال خلال","Confirmation email sent.":"أُرسلت رسالة التأكيد.","Enter your email first.":"أدخل بريدك أولاً."};
 const KEYS=Object.keys(AR).sort((a,b)=>b.length-a.length);
 const T=x=>LG==='ar'?KEYS.reduce((v,k)=>v.includes(k)?v.split(k).join(AR[k]):v,x):x;
@@ -290,7 +341,7 @@ const uuid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xx
 const MV=['withdraw','deposit','transfer'];
 const wn=id=>(wallets.find(w=>w.id===id)||{}).name||'';
 const bal=()=>Core.balances(wallets,Q(),(wallets[0]||{}).id).wallets;
-function afterLoss(msg){LS.removeItem('ht_hh');LS.removeItem('ht_c');hh=null;if(ch){try{sb.removeChannel(ch)}catch(e){}ch=null}alert(T(msg));boot()}
+function afterLoss(msg){LS.removeItem('ht_hh');LS.removeItem('ht_c');hh=null;if(ch){try{sb.removeChannel(ch)}catch(e){}ch=null}notify(T(msg));boot()}
 const lostAccess=()=>afterLoss('You no longer have access to this household.');
 async function houseView(){
   const v=$('#more');if(!navigator.onLine)return v.innerHTML=need();
@@ -301,11 +352,28 @@ async function houseView(){
    (owner?`<h2>Danger zone</h2><button class="btn danger" id="dh">Delete Household</button>`:'');
   v.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{
     if(!confirm(T('Remove member')+': '+b.dataset.n+'\n'+T('They lose access immediately. Their account and past transactions are kept.')))return;
-    const {error}=await sb.rpc('remove_member',{h:hh.id,uid:b.dataset.rm});error?alert(error.message):houseView()});
+    const {error}=await sb.rpc('remove_member',{h:hh.id,uid:b.dataset.rm});error?notify(error.message):houseView()});
   if($('#dh'))$('#dh').onclick=async()=>{
     if(!confirm(T('Delete this household? This removes the household and removes ALL members from it. Wallets, transactions and quick purchases are deleted. This cannot be undone. Your account is kept.')))return;
     const n=prompt(T('Type the household name to confirm')+': '+hh.name);if(n===null)return;
-    const {error}=await sb.rpc('delete_household',{h:hh.id,confirm_name:n});if(error)return alert(error.message);afterLoss('Household deleted.')};
+    const {error}=await sb.rpc('delete_household',{h:hh.id,confirm_name:n});if(error)return notify(error.message);afterLoss('Household deleted.')};
+}
+const SV={home:'M3 11l9-8 9 8M5 10v10h14V10',calendar:'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',chart:'M5 20V10M12 20V4M19 20v-7',list:'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',gear:'M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6',plus:'M12 5v14M5 12h14',go:'M7 17L17 7M8 7h9v9',wallet:'M3 7h15a3 3 0 013 3v8H6a3 3 0 01-3-3zM3 7V6a2 2 0 012-2h11M16 13h3',bank:'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18',user:'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6',down:'M12 5v14M6 13l6 6 6-6',up:'M12 19V5M6 11l6-6 6 6',swap:'M7 7h12l-3-3M17 17H5l3 3'};
+const svg=(n,c='')=>`<svg class="${c}" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${SV[n]}"/></svg>`;
+const ARW=LG==='ar'?'←':'→';const wicon=n=>/bank/i.test(n)?'bank':/personal/i.test(n)?'user':'wallet';
+function notify(m){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');document.body.appendChild(t)}t.textContent=m;t.className='on'+(/insufficient|could not|error|not allowed|expired|required|match|own a household|must be/i.test(m)?' bad':'');clearTimeout(notify.t);notify.t=setTimeout(()=>{t.className=''},4500)}
+const walletRows=()=>{const B=Core.balances(wallets,Q(),(wallets[0]||{}).id).wallets;return wallets.map(w=>({name:w.name,total:Math.max(0,B[w.id]||0)}))};
+const byWallet=rows=>{const m={};rows.forEach(r=>{const n=wn(r.wallet_id)||'?';m[n]=m[n]||{name:n,total:0,n:0};m[n].total+=+r.amount;m[n].n++});return Object.values(m).sort((a,b)=>b.total-a.total)};
+async function accountView(){const v=$('#more');
+  v.innerHTML=`<h2 style="margin:14px 2px 0">Account</h2><div class="card dz"><b>${T('Delete your account?')}</b><p>${T('This permanently deletes your account and cannot be undone.')}</p><p><small>${T('If you own a household that still has other members, remove them or delete the household first. If you are the only member, the household is deleted with your account. Entries you added in other households stay in their history as Deleted user.')}</small></p><input id="dc" placeholder="Type DELETE to confirm" autocomplete="off" autocapitalize="characters" aria-label="Type DELETE to confirm"><div class="err" id="de"></div><button class="btn danger" id="dd" disabled>Delete My Account</button><button class="btn alt" id="dx">Cancel</button></div>`;
+  $('#dc').oninput=e=>{$('#dd').disabled=e.target.value.trim()!=='DELETE'};$('#dx').onclick=()=>tab('home');
+  $('#dd').onclick=async()=>{if($('#dc').value.trim()!=='DELETE')return;
+    if(!navigator.onLine)return notify(T('Internet connection required to delete your account.'));
+    $('#dd').disabled=true;const {error}=await sb.rpc('delete_my_account',{confirm_text:'DELETE'});
+    if(error){$('#de').textContent=error.message;$('#dd').disabled=false;return notify(error.message)}
+    const uid=me;try{Qo.all().forEach(o=>Qo.remove(o.qid));LS.removeItem('ht_trash:'+uid)}catch(e){}
+    loggingOut=true;LS.removeItem('ht_hh');LS.removeItem('ht_c');hh=null;me=null;Qo=null;try{await sb.auth.signOut({scope:'local'})}catch(e){}
+    notify(T('Your account was deleted.'));boot()};
 }
 if('serviceWorker' in navigator){const had=!!navigator.serviceWorker.controller;let rl=0;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!rl){rl=1;location.reload()}});navigator.serviceWorker.register('sw.js')}
 boot();
