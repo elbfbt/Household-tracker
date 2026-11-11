@@ -26,3 +26,20 @@ Arabic/English: tap العربية / EN (login screen or top bar). Wallets: Hous
 
 ## Test checklist
 Sign up two accounts → join one household → add a purchase on each → confirm both see it live → go offline, add one, reconnect → confirm it appears once → confirm withdrawals do not raise "Today".
+
+## Version 2 (integrity release)
+SQL order for a fresh project: schema.sql, 002_analytics.sql, 003_wallets_offline.sql, 004_fix_withdraw.sql, **005_integrity_security.sql**.
+Already-deployed project: run only 005 (safe, changes no data, only rules and permissions).
+
+Files: `core.js` holds the single accounting rule set + the per-user offline queue; `index.html` uses it; `tests/unit.test.js` tests it.
+
+Tests: `node tests/unit.test.js` (no setup). Real-database tests: `npm i`, then `SUPABASE_URL=... SUPABASE_ANON_KEY=... node tests/integration.mjs` (Confirm email must be OFF; delete the throwaway users afterwards).
+
+## Version 3 (funds, members, quick purchases)
+SQL: after 005 run **006_funds_members_quickitems.sql**. It blocks negative wallets in the database (row-locked, atomic), adds owner-only remove-member and delete-household, quick-item dedupe and wallet names in stats. It changes no existing rows. Wallets that are ALREADY negative stay as they are; only further spending from them is blocked.
+Tests: `node tests/unit.test.js` (no setup) and `node tests/integration_v3.mjs` (needs your Supabase).
+
+## Version 4 (new look, quick purchases, delete account)
+SQL: after 006 run **007_account_deletion_quickitems.sql**. Deleting an account is done by a server function (no service-role key in the browser). Entries the user made in households that continue are KEPT and shown as "Deleted user". An owner whose household still has other members must remove them or delete the household first; a sole owner's household is deleted with the account.
+Quick Purchase = a saved item + price + automatic icon (never a transaction). Tapping its card makes the purchase.
+Tests: `npm test` (unit + UI smoke, no setup) and `node tests/integration_v4.mjs` (needs your Supabase).
