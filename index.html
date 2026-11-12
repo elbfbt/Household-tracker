@@ -11,7 +11,7 @@
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 body{padding:env(safe-area-inset-top) 0 0}
-main{max-width:520px;margin:0 auto;padding:6px 16px calc(112px + env(safe-area-inset-bottom))}
+main{max-width:520px;margin:0 auto;padding:2px max(14px,env(safe-area-inset-right)) calc(70px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
 [hidden]{display:none!important}
 button{font:inherit;color:inherit;border:0;cursor:pointer;background:none;-webkit-appearance:none;appearance:none;transition:transform .15s,filter .15s,background .15s}
 button:active{transform:scale(.97)}
@@ -21,45 +21,47 @@ input[type=date]{min-width:0;-webkit-appearance:none;appearance:none}
 input:focus,select:focus{border-color:var(--g);outline:none;box-shadow:0 0 0 4px rgba(13,79,60,.14)}
 h2{font-size:19px;font-weight:700;margin:0;letter-spacing:-.01em}small{color:var(--mut)}
 #home{position:relative}#more{max-width:760px;margin:0 auto}
-.top{display:flex;justify-content:space-between;align-items:center;padding:10px 0 8px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
 .brand{display:flex;align-items:center;gap:10px;font-size:18px;letter-spacing:-.01em}
 .logo{width:34px;height:34px;border-radius:11px;background:var(--g);color:#fff;display:grid;place-items:center}.logo svg{width:20px;height:20px}
 .tools{display:flex;align-items:center;gap:8px}
-.ic{width:42px;height:42px;border-radius:14px;background:var(--card);box-shadow:var(--sh);display:grid;place-items:center}
+.ic{width:44px;height:44px;border-radius:14px;background:var(--card);box-shadow:var(--sh);display:grid;place-items:center}
 .st{font-size:12px;color:var(--mut);background:var(--card);box-shadow:var(--sh);border-radius:99px;padding:6px 11px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-inline-end:6px}.off .dot{background:var(--bad)}.sync .dot{background:#e0a030;animation:pulse 1s infinite alternate}
 @keyframes pulse{to{opacity:.35}}
-.menu{position:absolute;inset-inline-end:0;top:60px;z-index:20;background:var(--card);border-radius:20px;box-shadow:0 12px 40px rgba(0,0,0,.2);padding:6px;min-width:230px}
+.menu{position:absolute;inset-inline-end:0;top:54px;z-index:20;background:var(--card);border-radius:20px;box-shadow:0 12px 40px rgba(0,0,0,.2);padding:6px;min-width:230px}
 .mi{display:flex;gap:10px;width:100%;padding:13px 14px;border-radius:14px;text-align:start;font-weight:600}.mi:hover{background:var(--mint)}.mi.dg{color:var(--bad)}
-.hero{position:relative;overflow:hidden;color:#fff;border-radius:28px;padding:22px 22px 18px;margin:6px 0 14px;background:radial-gradient(circle at 108% -8%,rgba(255,255,255,.14) 0 24%,transparent 25%),radial-gradient(circle at -6% 118%,rgba(255,255,255,.09) 0 30%,transparent 31%),linear-gradient(150deg,var(--g2),var(--g));box-shadow:0 14px 30px rgba(13,79,60,.28)}
+.hero{position:relative;overflow:hidden;color:#fff;border-radius:24px;padding:16px 18px 14px;margin:2px 0 10px;background:radial-gradient(circle at 108% -8%,rgba(255,255,255,.14) 0 24%,transparent 25%),radial-gradient(circle at -6% 118%,rgba(255,255,255,.09) 0 30%,transparent 31%),linear-gradient(150deg,var(--g2),var(--g));box-shadow:0 8px 20px rgba(13,79,60,.22)}
 .hero small{color:rgba(255,255,255,.74)}.ht{display:flex;justify-content:space-between;align-items:center}
-.pill{background:rgba(255,255,255,.16);color:#fff;border-radius:99px;padding:7px 13px;font-size:13px;font-weight:600}
-.bal{font-size:clamp(32px,10vw,46px);font-weight:800;letter-spacing:-.025em;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.pill{background:rgba(255,255,255,.16);color:#fff;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:600;position:relative}.pill::after{content:"";position:absolute;inset:-8px -6px}
+.bal{font-size:clamp(30px,9vw,40px);line-height:1.15;font-weight:800;letter-spacing:-.025em;margin:2px 0 0;font-variant-numeric:tabular-nums}
 .spent{font-size:14px}.spent b{margin-inline-start:6px}
-.hero .row{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.2)}.hero .row>div{flex:1}.hero .row b{display:block;font-size:15px;margin-top:2px;font-variant-numeric:tabular-nums}
-.wgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}#wb{display:contents}
-.wc{background:var(--card);box-shadow:var(--sh);border-radius:22px;padding:14px;text-align:start;display:flex;flex-direction:column;min-height:112px;position:relative}
-.wc b{font-size:19px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;margin-top:auto}.wc small{font-size:13px}
-.wi{width:38px;height:38px;border-radius:50%;background:var(--mint);color:var(--lk);display:grid;place-items:center;margin-bottom:8px}
-.wc.act{background:var(--mint)}.wc.act b{font-size:14px;color:var(--lk);font-weight:600}.go{position:absolute;inset-inline-end:14px;top:14px;color:var(--lk)}
-.cta{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--g);color:#fff;font-weight:700;font-size:18px;padding:18px;border-radius:20px;box-shadow:0 10px 22px rgba(13,79,60,.25)}
-.pl{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:grid;place-items:center}.pl svg{width:16px;height:16px}
-.chips2{display:flex;gap:8px;margin:12px 0 4px;flex-wrap:wrap}.chips2 button{flex:1 1 30%;background:var(--card);box-shadow:var(--sh);border-radius:16px;padding:12px 8px;font-weight:600;font-size:14px;min-height:48px}
-.sec{display:flex;justify-content:space-between;align-items:center;margin:22px 2px 10px}
+.hero .row{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.2)}.hero .row>div{flex:1}.hero .row b{display:block;font-size:15px;margin-top:1px;font-variant-numeric:tabular-nums}
+.wgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}#wb{display:contents}
+.wc{background:var(--card);box-shadow:var(--sh);border-radius:18px;padding:10px 12px 11px;text-align:start;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:8px;row-gap:5px;position:relative}
+.wc b{grid-column:1/-1;font-size:18px;line-height:1.2;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wc b.neg{color:var(--bad)}.wc small{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wi{width:28px;height:28px;border-radius:50%;background:var(--mint);color:var(--lk);display:grid;place-items:center}.wi svg{width:16px;height:16px}
+.wc.act{background:var(--mint)}.wc.act .wi{background:var(--card)}.wc.act small{padding-inline-end:20px;color:var(--tx);white-space:normal;line-height:1.2}.wc.act b{font-size:12.5px;color:var(--lk);font-weight:600;white-space:normal;letter-spacing:0}.go{position:absolute;inset-inline-end:10px;top:13px;color:var(--lk)}.go svg{width:18px;height:18px;display:block}
+.cta{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--g);color:#fff;font-weight:700;font-size:17px;padding:13px 16px;min-height:52px;border-radius:18px;box-shadow:0 6px 16px rgba(13,79,60,.22)}
+.pl{width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,.7);display:grid;place-items:center}.pl svg{width:15px;height:15px}
+.chips2{display:flex;gap:8px;margin:8px 0 0;flex-wrap:wrap}.chips2 button{flex:1 1 30%;background:var(--card);box-shadow:var(--sh);border-radius:14px;padding:8px 6px;font-weight:600;font-size:13.5px;line-height:1.2;min-height:44px}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:14px 2px 6px;min-height:32px}
 .link{color:var(--lk);font-weight:600;font-size:14px;padding:6px 4px}.link.danger{color:var(--bad)}
-.qgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.qc{background:var(--card);box-shadow:var(--sh);border-radius:22px;padding:14px;text-align:start;display:flex;align-items:center;gap:12px;min-height:76px}
-.qe{width:44px;height:44px;border-radius:50%;background:var(--mint);display:grid;place-items:center;font-size:22px;flex:none}.qc b{display:block;font-weight:700;overflow-wrap:anywhere}.qc small{font-size:13px;font-variant-numeric:tabular-nums}
-.tx{display:flex;align-items:center;gap:12px;background:var(--card);box-shadow:var(--sh);border-radius:20px;padding:12px 14px;margin-bottom:10px}.tx>div:first-child{flex:1;min-width:0}
-.ti{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--mint);color:var(--lk)}.ti.neg{background:#c8412b1a;color:var(--bad)}.ti.pos{background:#1f8a631f;color:var(--ok)}.ti svg{width:19px;height:19px}
+.qgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.qc{background:var(--card);box-shadow:var(--sh);border-radius:18px;padding:9px 12px;text-align:start;display:flex;align-items:center;gap:10px;min-height:58px}
+.qe{width:38px;height:38px;border-radius:50%;background:var(--mint);display:grid;place-items:center;font-size:20px;flex:none}.qc>span:last-child{min-width:0}.qc b{display:block;font-weight:700;line-height:1.25;overflow-wrap:anywhere}.qc small{font-size:13px;font-variant-numeric:tabular-nums}
+.tx{display:flex;align-items:center;gap:10px;background:var(--card);box-shadow:var(--sh);border-radius:18px;padding:9px 12px;margin-bottom:8px}.tx>div:first-child{flex:1;min-width:0}
+.ti{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--mint);color:var(--lk)}.ti.neg{background:#c8412b1a;color:var(--bad)}.ti.pos{background:#1f8a631f;color:var(--ok)}.ti svg{width:19px;height:19px}
 .tm{flex:1;min-width:0}.tm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tm small{display:block;font-size:12.5px;line-height:1.35}.wl{color:var(--tx);opacity:.78}
-.ta{display:flex;align-items:center;gap:4px;flex:none}.amt{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}.pos{color:var(--ok)}.neg{color:var(--bad)}.x{font-size:22px;color:var(--mut);padding:2px 8px}
-#nv{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));max-width:496px;margin:0 auto;display:flex;background:var(--card);border-radius:26px;box-shadow:0 10px 36px rgba(13,50,40,.22);padding:6px;z-index:5}
-#nv button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 10px;border-radius:20px;color:var(--mut);font-size:12px;font-weight:600;position:relative}
-#nv button svg{width:23px;height:23px}#nv button.on{color:var(--lk)}#nv button.on::after{content:"";position:absolute;bottom:3px;width:22px;height:3px;border-radius:3px;background:var(--lk)}
+.ta{display:flex;align-items:center;gap:4px;flex:none}.amt{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}.pos{color:var(--ok)}.neg{color:var(--bad)}.x{font-size:22px;color:var(--mut);padding:8px 10px;margin:-6px -8px -6px 0;min-width:40px;min-height:40px}[dir=rtl] .x{margin:-6px 0 -6px -8px}.amt[data-e]{cursor:pointer}
+/* Bottom navigation: a real tab bar. Flush with the bottom edge; the bar's own background extends UNDER the
+   iPhone home indicator while its buttons stay above it (padding = safe-area-inset-bottom, 0 on normal phones). */
+#nv{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:var(--card);border-top:1px solid var(--ln);box-shadow:0 -4px 18px rgba(13,50,40,.07);padding:3px max(6px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(6px,env(safe-area-inset-left));z-index:5}
+#nv button{flex:1;max-width:150px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 0 8px;border-radius:14px;color:var(--mut);font-size:11.5px;font-weight:600;position:relative}
+#nv button svg{width:23px;height:23px}#nv button.on{color:var(--lk)}#nv button.on::after{content:"";position:absolute;top:-3px;width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--lk)}
 .sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(10,25,20,.45);display:none;align-items:flex-end;z-index:30}.sheet.on{display:flex;animation:fade .2s}
 @keyframes fade{from{opacity:0}}@keyframes up{from{transform:translateY(30px);opacity:.6}}
-.sheet>div{background:var(--bg);width:100%;max-width:520px;margin:0 auto;border-radius:28px 28px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto;-webkit-overflow-scrolling:touch;animation:up .25s ease}
+.sheet>div{background:var(--bg);width:100%;max-width:520px;margin:0 auto;border-radius:28px 28px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:92vh;max-height:92dvh;overflow:auto;-webkit-overflow-scrolling:touch;animation:up .25s ease}
 #st{font-size:20px;font-weight:700}#amt{font-size:36px;font-weight:800;text-align:center;min-height:68px;letter-spacing:-.02em}.lb{display:block;margin:12px 4px 0;font-weight:600;font-size:13px}
 .qrow{display:flex;align-items:center;gap:10px;padding:12px 4px;font-weight:600}.qrow input{width:24px;height:24px;margin:0;min-height:0;accent-color:var(--g)}
 .btn{width:100%;padding:16px;border-radius:18px;background:var(--g);color:#fff;font-weight:700;font-size:17px;margin-top:10px;min-height:54px}.btn.alt{background:var(--card);color:var(--lk);box-shadow:var(--sh)}.btn.danger{background:var(--bad);color:#fff}.btn:disabled{opacity:.45}
@@ -71,15 +73,21 @@ h2{font-size:19px;font-weight:700;margin:0;letter-spacing:-.01em}small{color:var
 .bi{margin:12px 0}.bl{display:flex;justify-content:space-between;font-size:14px;gap:8px}.bt{height:10px;border-radius:6px;background:var(--mint);margin-top:6px;overflow:hidden}.bt i{display:block;height:100%;border-radius:6px;background:var(--g)}
 .dc{display:flex;align-items:flex-end;gap:4px;height:100px;margin:12px 0}.dc i{flex:1;background:var(--g);opacity:.85;border-radius:6px 6px 0 0;min-height:3px}
 .dn{display:flex;justify-content:space-between;align-items:center;gap:10px}.dn button{background:var(--card);box-shadow:var(--sh);border-radius:14px;padding:12px 18px;font-size:18px}.dn input{flex:1;margin:0;text-align:center}
-.syb{background:#c8412b14;border:1px solid #c8412b55;border-radius:16px;padding:10px 12px;margin:6px 0;display:flex;flex-direction:column;gap:4px}
-#toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:#14201c;color:#fff;padding:13px 18px;border-radius:16px;font-weight:600;opacity:0;pointer-events:none;transition:.2s;max-width:min(92vw,440px);z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.3)}#toast.on{opacity:1;transform:translate(-50%,0)}#toast.bad{background:var(--bad)}
+.syb{background:#c8412b14;border:1px solid #c8412b55;border-radius:16px;padding:6px 12px;margin:2px 0 8px;display:flex;flex-direction:column;gap:2px;align-items:flex-start}.syb .link{text-align:start}
+/* first paint, before any script has run: the app shell, not a blank "Loading…" page */
+.sk{border-radius:18px;background:linear-gradient(100deg,var(--ln) 30%,var(--card) 50%,var(--ln) 70%);background-size:200% 100%;animation:sk 1.2s linear infinite}@keyframes sk{to{background-position:-200% 0}}
+.skh{height:150px;border-radius:24px;margin:2px 0 10px}.skw{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.skw i{height:68px;display:block}.skc{height:52px;margin-bottom:10px}.skt{height:58px;margin-bottom:8px}
+#toast{position:fixed;left:50%;bottom:calc(72px + env(safe-area-inset-bottom));width:max-content;transform:translate(-50%,20px);background:#14201c;color:#fff;padding:13px 18px;border-radius:16px;font-weight:600;opacity:0;pointer-events:none;transition:.2s;max-width:min(92vw,440px);z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.3)}#toast.on{opacity:1;transform:translate(-50%,0)}#toast.bad{background:var(--bad)}
 [dir=rtl] .flip svg{transform:scaleX(-1)}
-@media(max-width:360px){.wgrid,.qgrid{gap:8px}.brand b{font-size:16px}.chips2 button{flex-basis:100%}}
-@media(min-width:600px){main{max-width:760px;padding-left:24px;padding-right:24px}.wgrid{grid-template-columns:repeat(4,1fr)}.qgrid{grid-template-columns:repeat(3,1fr)}.sheet{align-items:center}.sheet>div{border-radius:28px;max-width:460px}}
+@media(max-width:360px){.wgrid,.qgrid{gap:8px}.brand b{font-size:16px}.wc b{font-size:16px}.hero .row b{font-size:13.5px}}
+@media(min-width:600px){main{max-width:760px;padding-left:24px;padding-right:24px;padding-top:6px}.hero{padding:20px 22px 16px}.wc b.neg,.wc b{font-size:19px}.wgrid{grid-template-columns:repeat(4,1fr)}.qgrid{grid-template-columns:repeat(3,1fr)}.sheet{align-items:center}.sheet>div{border-radius:28px;max-width:460px}}
 @media(min-width:900px){main{max-width:1120px;padding-bottom:40px}.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;align-items:start}.cols>div+div{position:sticky;top:76px;max-height:calc(100vh - 100px);overflow:auto}
-#nv{position:sticky;top:8px;bottom:auto;left:auto;right:auto;max-width:none;margin:6px 0 10px}#more{max-width:900px}}
+#nv{position:sticky;top:8px;bottom:auto;left:auto;right:auto;max-width:none;margin:6px 0 10px;padding:6px;border:0;border-radius:22px;box-shadow:0 10px 36px rgba(13,50,40,.16)}#nv button{max-width:none}#nv button.on::after{top:auto;bottom:2px;border-radius:3px}#toast{bottom:24px}#more{max-width:900px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-</style></head><body><main id="app"><p style="padding:48px 20px;color:#889;font:17px system-ui">Loading…</p></main>
+</style></head><body><main id="app"><div id="boot"><header class="top"><div class="brand"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg></span><b>Household Tracker</b></div><span class="st"><span class="sync"><i class="dot"></i><span id="bootmsg">Loading…</span></span></span></header><div id="bootsk" hidden><div class="sk skh"></div><div class="skw"><i class="sk"></i><i class="sk"></i></div><div class="sk skc"></div><div class="sk skt"></div><div class="sk skt"></div></div></div></main>
+<script>/* returning user: show the dashboard-shaped shell immediately (the real cached numbers replace it as soon as the app script runs) */
+try{if(localStorage.getItem('ht_lang')==='ar'){document.documentElement.lang='ar';document.documentElement.dir='rtl';document.getElementById('bootmsg').textContent='جارٍ التحميل…'}
+if(localStorage.getItem('ht-auth')&&localStorage.getItem('ht_hh'))document.getElementById('bootsk').hidden=false}catch(e){}</script>
 <div class="sheet" id="sh" role="dialog" aria-modal="true" aria-labelledby="st"><div><b id="st"></b><small class="lb">Amount</small><input id="amt" inputmode="decimal" placeholder="0" aria-label="Amount"><input id="cat" placeholder="Category" hidden><small class="lb">Wallet</small><select id="wl" aria-label="Wallet"></select><select id="wl2" aria-label="To wallet"></select><small class="lb" id="ntl">Description</small><input id="nt" placeholder="Note (optional)"><label class="qrow" id="qrow" hidden><input type="checkbox" id="qa"><span>Add to Quick Purchases</span></label><small class="lb" id="qpl" hidden>Quick Purchase default price</small><input id="qp" inputmode="decimal" placeholder="Default price" hidden><button class="btn" id="sv">Save</button><button class="btn alt" id="qo" hidden>Add to Quick Purchases Only</button><button class="btn alt" onclick="sh.classList.remove('on')">Cancel</button></div></div>
 <script src="config.js"></script>
 <script src="core.js"></script>
@@ -91,29 +99,74 @@ const LG=LS.getItem('ht_lang')||'en';const $=s=>document.querySelector(s),app=$(
 const sb=supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'ht-auth'}});
 const fmt=n=>new Intl.NumberFormat(LG==='ar'?'ar-EG':'en-EG',{style:'currency',currency:'EGP',maximumFractionDigits:2}).format(n||0);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let wallets=[],hh=null,items=[],txs=[],sum={},edit=false,ch=null,status='';
+let wallets=[],hh=null,items=[],txs=[],sum={},role='',edit=false,ch=null,cur='home';
 let me=null,Qo=null,authLost=false,loggingOut=false;const Q=()=>Qo?Qo.all():[];
+/* startup / freshness state: haveData = something real (cache or server) is on screen; fresh = server data arrived this session;
+   sessionOk = the server has confirmed the stored session this session; loading = requests in flight; loadErr = last refresh error */
+let haveData=false,fresh=false,sessionOk=false,loading=0,loadErr='',bootSeq=0,loadSeq=0,lastLoad=0;
+const SHELL=app.innerHTML;
+const jp=k=>{try{return JSON.parse(LS.getItem(k)||'null')}catch(e){return null}};
+const storedUid=()=>{const x=jp('ht-auth');return(x&&x.user&&x.user.id)||null};   // what supabase-js persisted; no network
+const timeout=(p,ms)=>Promise.race([p,new Promise(r=>setTimeout(()=>r(null),ms))]);
+const cacheGet=()=>{const c=jp('ht_c');return c&&hh&&(!c.uid||c.uid===me)&&(!c.hid||c.hid===hh.id)?c:null};
+const cachePut=()=>{if(me&&hh)LS.setItem('ht_c',JSON.stringify({uid:me,hid:hh.id,role,sum,items,txs,wallets}))};
+function resetState(){wallets=[];items=[];txs=[];sum={};role='';edit=false;haveData=false;fresh=false;loadErr='';authLost=false;loadSeq++}
+function setUser(uid){if(me!==uid){resetState();me=uid;Qo=Core.Queue(LS,uid)}}
+function dropDash(){if(ch){try{sb.removeChannel(ch)}catch(e){}ch=null}}
+function signedOut(msg){bootSeq++;dropDash();me=null;Qo=null;hh=null;sessionOk=false;resetState();authView(msg)}
+const EXPIRED='Your session expired. Log in again. Your unsynced entries are kept on this device.';
+/* Log out must also work offline / when the server is unreachable: supabase-js keeps the session if the request fails. */
+async function logout(){loggingOut=true;bootSeq++;
+  try{const r=await timeout(sb.auth.signOut(),6000);if(!r||r.error)await timeout(sb.auth.signOut({scope:'local'}),4000)}catch(e){}
+  if(storedUid()){try{localStorage.removeItem('ht-auth')}catch(e){}LS.removeItem('ht_hh');LS.removeItem('ht_c');return location.reload()}
+  dropDash();hh=null;me=null;Qo=null;sessionOk=false;resetState();LS.removeItem('ht_hh');LS.removeItem('ht_c');boot()}
 
-sb.auth.onAuthStateChange(e=>{ if(e==='PASSWORD_RECOVERY'){const p=prompt('New password (min 6 characters)');if(p)sb.auth.updateUser({password:p}).then(({error})=>notify(error?error.message:'Password updated'))}
-  if(e==='SIGNED_OUT'&&me&&!loggingOut){me=null;Qo=null;authView('Your session expired. Log in again. Your unsynced entries are kept on this device.')} });
+sb.auth.onAuthStateChange(e=>{ if(e==='PASSWORD_RECOVERY'){const p=prompt('New password (min 6 characters)');if(p)sb.auth.updateUser({password:p}).then(({error})=>notify(error?error.message:'Password updated',!!error))}
+  if(e==='SIGNED_OUT'&&me&&!loggingOut)signedOut(EXPIRED) });
 function adoptLegacy(){const raw=LS.getItem('ht_q');if(!raw)return;let old=[];try{old=JSON.parse(raw)}catch(e){}
   const ins=old.filter(o=>!o.op&&o.household_id&&o.client_id),ops=old.filter(o=>o.op);
   if(!ins.length){if(ops.length)LS.setItem('ht_legacy_ops',JSON.stringify(ops));LS.removeItem('ht_q');return}
   if(confirm(`${ins.length} entries from an older version are waiting on this device. Were they entered by YOU? OK = sync them to this account. Cancel = keep them isolated.`)){
     ins.forEach(o=>Qo.push(o));if(ops.length)LS.setItem('ht_legacy_ops',JSON.stringify(ops));LS.removeItem('ht_q')}}
+function shellView(){app.innerHTML=SHELL;const k=$('#bootsk');if(k)k.hidden=false}
+/* Startup. Nothing here blocks the first paint on the network:
+   1. returning user (stored session + cached household): the dashboard is painted from the local cache at once;
+   2. the session is then confirmed with Supabase in the background (this may refresh an expired access token);
+   3. membership is confirmed and fresh data replaces the cached numbers.
+   A session that cannot be CHECKED (offline / slow / Supabase down) is not treated as expired: the cached dashboard
+   and the offline queue keep working and the check is repeated on reconnect. Only a session the server REJECTS
+   (supabase-js then removes it from storage) leads to the login screen. */
 async function boot(){
-  loggingOut=false;
-  const t0=await Promise.race([sb.auth.getSession(),new Promise(r=>setTimeout(()=>r(null),8000))]);
-  const session=t0&&t0.data&&t0.data.session,cached=JSON.parse(LS.getItem('ht_hh')||'null');
-  if(!session){if(!t0&&cached&&LS.getItem('ht_c')){hh=cached;return dashView()}return authView()}
-  me=session.user.id;Qo=Core.Queue(LS,me);LS.setItem('ht_last_uid',me);adoptLegacy();
-  let r;try{r=await sb.from('members').select('households(id,name,invite_code)').limit(1)}catch(e){r={error:e}}
-  if(r.data&&r.data[0]){hh=r.data[0].households;LS.setItem('ht_hh',JSON.stringify(hh))}
-  else if(r.error&&cached)hh=cached;
-  else if(r.error)return retryView(r.error.message);
-  hh?dashView():setupView();
+  loggingOut=false;const my=++bootSeq;
+  const su=storedUid(),cached=jp('ht_hh'),urlAuth=/[#?&](access_token|refresh_token|code|error|error_code|type)=/.test(location.hash+location.search);
+  let shown=false;
+  if(su&&cached&&cached.id&&!urlAuth&&LS.getItem('ht_last_uid')===su){
+    if(!(me===su&&hh&&hh.id===cached.id&&$('#bal'))){setUser(su);hh=cached;dashView()}
+    shown=true}
+  else if(su&&!$('#boot'))shellView();
+  const t0=await timeout(sb.auth.getSession().then(x=>x,e=>({error:e})),8000);
+  if(my!==bootSeq)return;
+  const session=t0&&t0.data&&t0.data.session;
+  if(!session){
+    if(!t0||storedUid()){sessionOk=false;                                    // could not be verified (not: rejected)
+      if(shown)return netPaint();
+      return retryView((t0&&t0.error&&t0.error.message)||'The server is taking too long to answer.')}
+    return signedOut(su||me?EXPIRED:'')}
+  const uid=session.user.id;sessionOk=true;authLost=false;
+  if(uid!==me){if(shown){shown=false;dropDash();hh=null}setUser(uid)}
+  LS.setItem('ht_last_uid',uid);adoptLegacy();
+  if(!shown&&!$('#boot'))shellView();
+  const r=(await timeout(sb.from('members').select('role,households(id,name,invite_code)').eq('user_id',uid).limit(1).then(x=>x,e=>({error:e})),12000))||{error:{message:'The server is taking too long to answer.'}};
+  if(my!==bootSeq)return;
+  if(r.data&&r.data[0]&&r.data[0].households){const h=r.data[0].households;role=r.data[0].role||role;LS.setItem('ht_hh',JSON.stringify(h));
+    if(shown&&hh&&hh.id===h.id&&$('#bal')){hh=h;const i=$('#inv');if(i)i.textContent='Invite code: '+h.invite_code;return paint()}
+    hh=h;return dashView()}
+  if(r.data){LS.removeItem('ht_hh');LS.removeItem('ht_c');dropDash();hh=null;resetState();return setupView()}   // signed in, no household (yet / any more)
+  if(shown)return netPaint();
+  if(cached&&cached.id&&su===uid&&LS.getItem('ht_c')){hh=cached;return dashView()}
+  retryView(r.error.message);
 }
-function retryView(m){app.innerHTML=`<div class="auth"><h1>Can't reach the server</h1><p style="color:var(--mut)">${esc(m)}</p><button class="btn" onclick="boot()">Try again</button></div>`}
+function retryView(m){app.innerHTML=`<div class="auth"><h1>Can't reach the server</h1><p style="color:var(--mut)">${esc(m)}</p><button class="btn" id="rt" onclick="shellView();boot()">Try again</button><button class="link" onclick="logout()">Log out</button></div>`}
 function authView(msg='',mode='in'){
   const up=mode==='up';
   app.innerHTML=`<div class="auth"><button class="link" onclick="setLang()">العربية / EN</button><h1>${up?'Create account':'Household Tracker'}</h1><p style="color:var(--mut)">${up?'Use your own email. Each family member needs their own account.':'Every purchase, one tap.'}</p>
@@ -126,22 +179,25 @@ function authView(msg='',mode='in'){
   const tick=()=>{clearInterval(tm);const f=()=>{const l=Math.ceil(((+LS.getItem('ht_rs')||0)-Date.now())/1000);rs.disabled=l>0;rs.textContent=l>0?`Resend in ${l}s`:'Resend confirmation email';if(l<=0)clearInterval(tm)};f();tm=setInterval(f,1000)};
   rs.onclick=async()=>{const email=$('#em').value.trim();if(!email)return fail({message:'Enter your email first.'});LS.setItem('ht_rs',Date.now()+60000);tick();
     const{error}=await sb.auth.resend({type:'signup',email,options:{emailRedirectTo:location.origin+location.pathname}});$('#er').textContent=error?error.message:'Confirmation email sent.'};
-  $('#go').onclick=async()=>{LS.removeItem('ht_hh');LS.removeItem('ht_c');
+  $('#go').onclick=async()=>{const go=$('#go');if(go.disabled)return;go.disabled=true;LS.removeItem('ht_hh');LS.removeItem('ht_c');   // disabled: a double tap must not sign up / log in twice
+    try{
     if(up){const{data,error}=await sb.auth.signUp({...v(),options:{data:{name:$('#nm').value.trim()},emailRedirectTo:location.origin+location.pathname}});
-      if(error)fail(error);else if(data.session)boot();else{$('#er').textContent='Check your email to confirm, then log in.';rs.hidden=false;tick()}}
-    else{const{error}=await sb.auth.signInWithPassword(v());if(!error)return boot();fail(error);if(/confirm/i.test(error.message)){rs.hidden=false;tick()}}};
+      if(error)fail(error);else if(data.session)return boot();else{$('#er').textContent='Check your email to confirm, then log in.';rs.hidden=false;tick()}}
+    else{const{error}=await sb.auth.signInWithPassword(v());if(!error)return boot();fail(error);if(/confirm/i.test(error.message)){rs.hidden=false;tick()}}
+    }catch(e){fail(e)}
+    go.disabled=false};
   if(!up)$('#fp').onclick=async()=>{const{error}=await sb.auth.resetPasswordForEmail($('#em').value.trim(),{redirectTo:location.origin+location.pathname});$('#er').textContent=error?error.message:'Reset link sent to your email.'};
 }
 function setupView(){
   app.innerHTML=`<div class="auth"><h1>Your household</h1><p style="color:var(--mut)">Start a new one, or join with a code.</p>
   <input id="hn" placeholder="Household name"><button class="btn" id="cr">Create household</button>
-  <input id="cd" placeholder="Invitation code" style="margin-top:22px"><button class="btn" id="jn">Join household</button><div class="err" id="er"></div><button class="link" onclick="sb.auth.signOut().then(()=>{LS.removeItem('ht_hh');LS.removeItem('ht_c');boot()})">Log out</button></div>`;
+  <input id="cd" placeholder="Invitation code" style="margin-top:22px"><button class="btn" id="jn">Join household</button><div class="err" id="er"></div><button class="link" onclick="logout()">Log out</button></div>`;
   const go=async(fn,a)=>{const{error}=await sb.rpc(fn,a);error?$('#er').textContent=error.message:boot()};
   $('#cr').onclick=()=>go('create_household',{hname:$('#hn').value.trim()||'Home'});
   $('#jn').onclick=()=>go('join_household',{code:$('#cd').value});
 }
-async function dashView(){
-  app.innerHTML=`<nav id="nv" aria-label="Main"><button data-n="home" class="on">${svg('home')}<span>Home</span></button><button data-n="daily">${svg('calendar')}<span>Daily</span></button><button data-n="stats">${svg('chart')}<span>Stats</span></button><button data-n="hist">${svg('list')}<span>History</span></button></nav><div id="home">
+function dashView(){
+  cur='home';app.innerHTML=`<nav id="nv" aria-label="Main"><button data-n="home" class="on">${svg('home')}<span>Home</span></button><button data-n="daily">${svg('calendar')}<span>Daily</span></button><button data-n="stats">${svg('chart')}<span>Stats</span></button><button data-n="hist">${svg('list')}<span>History</span></button></nav><div id="home">
   <header class="top"><div class="brand"><span class="logo">${svg('home')}</span><b>Household Tracker</b></div><div class="tools"><span class="st"><span id="net"><i class="dot"></i><span id="ns"></span></span></span><button class="ic" id="gear" aria-label="Settings" aria-expanded="false">${svg('gear')}</button></div></header>
   <div id="menu" class="menu" hidden><button class="mi" id="inv">Invite code: ${esc(hh.invite_code)}</button><button class="mi" id="hm">Household</button><button class="mi" onclick="setLang()">العربية / EN</button><button class="mi" id="ac">Account</button><button class="mi dg" id="lo">Log out</button></div>
   <div id="syb" class="syb" hidden></div><div class="cols"><div>
@@ -153,47 +209,69 @@ async function dashView(){
   </div><div><div class="sec"><h2>Recent</h2><button class="link" id="va">View all</button></div><div id="tl"></div></div></div></div><div id="more" hidden></div>`;
   {const m=$('#menu'),g=$('#gear');g.onclick=e=>{e.stopPropagation();m.hidden=!m.hidden;g.setAttribute('aria-expanded',String(!m.hidden))};m.onclick=e=>{if(e.target.closest('button'))m.hidden=true};if(!window._mc){window._mc=1;document.addEventListener('click',()=>{const x=$('#menu');if(x)x.hidden=true})}}
   $('#per').onclick=()=>{const o=['today','week','month'];LS.setItem('ht_per',o[(o.indexOf(LS.getItem('ht_per')||'month')+1)%3]);paint()};$('#va').onclick=()=>tab('hist');$('#ac').onclick=()=>tab('account');
-  $('#lo').onclick=()=>{const n=Q().filter(o=>o.state==='pending').length;if(n&&!confirm(T('You have unsynced entries. They stay on this device and sync the next time this account logs in. Log out anyway?')))return;loggingOut=true;sb.auth.signOut().then(()=>{hh=null;me=null;Qo=null;LS.removeItem('ht_hh');LS.removeItem('ht_c');boot()})};
+  $('#lo').onclick=()=>{const n=Q().filter(o=>o.state==='pending').length;if(n&&!confirm(T('You have unsynced entries. They stay on this device and sync the next time this account logs in. Log out anyway?')))return;logout()};
   $('#inv').onclick=()=>{const t=`Join our household in Household Tracker with code: ${hh.invite_code}\n${location.origin+location.pathname}`;navigator.share?navigator.share({text:t}):prompt('Send this to your family:',t)};
   $('#ed').onclick=()=>{edit=!edit;paint()};document.querySelectorAll('#nv button').forEach(b=>b.onclick=()=>tab(b.dataset.n));$('#hm').onclick=()=>tab('house');
   document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>openSheet(b.dataset.t));
-  if(ch)sb.removeChannel(ch);
+  dropDash();const hid=hh.id;
+  // realtime joins only once supabase-js has loaded the stored session (no network unless the token must be refreshed), so the channel is authorised as the user
+  sb.auth.getSession().then(()=>0,()=>0).then(()=>{if(!hh||hh.id!==hid||!$('#bal')||ch)return;
   const F0={schema:'public',table:'transactions'},fl=`household_id=eq.${hh.id}`;
-  ch=sb.channel('tx-'+hh.id).on('postgres_changes',{...F0,event:'INSERT',filter:fl},loadSoon).on('postgres_changes',{...F0,event:'UPDATE',filter:fl},loadSoon).on('postgres_changes',{...F0,event:'DELETE'},loadSoon).on('postgres_changes',{event:'DELETE',schema:'public',table:'members'},p=>{if(p.old&&p.old.user_id===me)lostAccess()}).subscribe(st=>{if(st==='SUBSCRIBED')loadSoon()});
-  {const c=JSON.parse(LS.getItem('ht_c')||'null');if(c){({sum,items,txs,wallets}=c);paint()}}await load();flush();
+  ch=sb.channel('tx-'+hh.id).on('postgres_changes',{...F0,event:'INSERT',filter:fl},loadSoon).on('postgres_changes',{...F0,event:'UPDATE',filter:fl},loadSoon).on('postgres_changes',{...F0,event:'DELETE'},loadSoon).on('postgres_changes',{event:'DELETE',schema:'public',table:'members'},p=>{if(p.old&&p.old.user_id===me)lostAccess()}).subscribe(st=>{if(st==='SUBSCRIBED'&&Date.now()-lastLoad>3000)loadSoon()})});   // SUBSCRIBED again after a drop: catch up (the first load is already running)
+  // cached numbers first (no network), then sync the offline queue and replace them with fresh data in the background
+  {const c=cacheGet();if(c){({sum,items,txs,wallets}=c);sum=sum||{};items=items||[];txs=txs||[];wallets=wallets||[];role=role||c.role||'';haveData=true}}
+  paint();flush().then(did=>{if(!did)load()});
 }
 let warned=false;const warnStore=()=>{if(LS.failed&&!warned){warned=true;notify(T('Your browser could not save data on this device. Entries may be lost if you close the app. Free some space or leave private mode.'))}};
 let lt;const loadSoon=()=>{clearTimeout(lt);lt=setTimeout(load,250)};
-function netPaint(){const n=$('#net');if(!n)return;const all=Q(),q=all.filter(o=>o.state==='pending').length,bad=all.filter(o=>o.state==='failed'||o.state==='conflict').length;
-  const s=!navigator.onLine?'off':q?'sync':'';n.className=s;$('#ns').textContent=s==='off'?`Offline${q?` · ${q} waiting`:''}`:q?`Syncing ${q}…`:'Online';
+const blockedOp=(o,all)=>!!o.dep&&all.some(x=>x.qid===o.dep&&x.state!=='pending');   // waits for an entry that failed: not "syncing"
+function netPaint(){const n=$('#net');if(!n)return;const all=Q(),q=all.filter(o=>o.state==='pending'&&!blockedOp(o,all)).length,bad=all.filter(o=>o.state==='failed'||o.state==='conflict').length;
+  const off=!navigator.onLine,s=off?'off':(q||loading)?'sync':loadErr?'off':'';n.className=s;
+  $('#ns').textContent=off?`Offline${q?` · ${q} waiting`:''}`:q?`Syncing ${q}…`:loading?'Updating…':loadErr?'Saved data':'Online';
   const f=Core.foreign(LS,me),b=$('#syb');let h='';
   if(authLost)h+=`<button class="link" data-act="relogin">Session expired. Log in again to sync ${q} entries.</button>`;
+  else if(loadErr&&!off)h+=`<button class="link" data-act="reload">${T("Couldn't refresh. Showing saved data. Tap to retry.")}</button><small>${esc(loadErr)}</small>`;
   if(bad)h+=`<button class="link" data-act="sync">${bad} entries need attention</button>`;
   if(f.length)h+=`<small>${f.reduce((a,x)=>a+x.count,0)} entries from another account are waiting on this device. Log in as that account to sync them.</small>`;
-  b.innerHTML=h;b.hidden=!h;b.querySelectorAll('[data-act]').forEach(x=>x.onclick=()=>x.dataset.act==='sync'?tab('sync'):(authLost=false,authView('Log in to continue syncing.')))}
+  b.innerHTML=h;b.hidden=!h;b.querySelectorAll('[data-act]').forEach(x=>x.onclick=()=>{const a=x.dataset.act;if(a==='sync')return tab('sync');if(a==='reload'){if(!sessionOk)boot();return load()}signedOut('Log in to continue syncing.')})}
 async function load(){
-  if(navigator.onLine){
-    const [a,b,c,d,e]=await Promise.all([sb.rpc('household_summary',{h:hh.id}),sb.from('quick_items').select('*').eq('household_id',hh.id).order('name'),
-      sb.from('transactions').select('*,profiles(name)').eq('household_id',hh.id).order('created_at',{ascending:false}).order('id').limit(40),sb.rpc('wallet_balances',{h:hh.id}),sb.from('members').select('user_id').eq('household_id',hh.id).eq('user_id',me)]);
-    if(e&&!e.error&&e.data&&!e.data.length)return lostAccess();
-    if(a.data&&d.data){sum=a.data;items=b.data||[];txs=c.data||[];wallets=d.data;LS.setItem('ht_c',JSON.stringify({sum,items,txs,wallets}))}
-  }else{const c=JSON.parse(LS.getItem('ht_c')||'null');if(c)({sum,items,txs,wallets}=c)}
+  if(!hh||!me)return;const my=++loadSeq,h=hh.id;lastLoad=Date.now();
+  if(!navigator.onLine){const c=!haveData&&cacheGet();if(c){({sum,items,txs,wallets}=c);haveData=true}return paint()}
+  loading++;netPaint();
+  try{
+    const [a,b,c,d,e]=await Promise.all([sb.rpc('household_summary',{h}),sb.from('quick_items').select('*').eq('household_id',h).order('name'),
+      sb.from('transactions').select('*,profiles(name)').eq('household_id',h).order('created_at',{ascending:false}).order('id').limit(40),sb.rpc('wallet_balances',{h}),sb.from('members').select('user_id,role').eq('household_id',h).eq('user_id',me)].map(p=>p.then(x=>x,er=>({error:er}))));
+    if(my!==loadSeq||!hh||hh.id!==h)return;                       // a newer load (or logout / account switch) owns the screen now
+    if(!e.error&&e.data&&!e.data.length)return lostAccess();
+    const er=a.error||d.error||c.error||b.error;
+    if(!a.error&&!d.error&&a.data&&d.data){sum=a.data;wallets=d.data;if(!b.error)items=b.data||[];if(!c.error)txs=c.data||[];if(e.data&&e.data[0])role=e.data[0].role||role;haveData=true;fresh=true;cachePut()}
+    loadErr=er?String(er.message||er):'';
+    if(er&&Core.classify(er,a.status||d.status)==='auth'&&!storedUid())return signedOut(EXPIRED);
+  }catch(x){if(my===loadSeq)loadErr=String((x&&x.message)||x)}
+  finally{loading--}
   paint();
 }
+const canMod=t=>!role||role==='owner'||t.user_id===me;   // mirrors RLS (creator or owner); the database is still the authority
+function askDelete(x){if(!x)return;let m=T('Delete this transaction?');
+  const B0=bal(),B=Core.balances(wallets,[...Q(),{op:'del',old:x,state:'pending'}],(wallets[0]||{}).id).wallets,neg=wallets.filter(w=>B[w.id]<0&&B[w.id]<B0[w.id]);
+  if(neg.length)m+='\n\n'+T('This entry added money that has already been spent, so deleting it will leave a negative balance')+': '+neg.map(w=>T(w.name)+' '+fmt(B[w.id])).join(', ');
+  if(confirm(m))queueOp({op:'del',id:x.id,old:x})}
 function paint(){
   if(!$('#bal'))return;
   const q=Q(),P=Core.balances(wallets,q,(wallets[0]||{}).id),SP=Core.spendDeltas(q,Date.now());
-  $('#bal').textContent=fmt(wallets.length?P.total:(sum.balance||0));
-  $('#s1').textContent=fmt((sum.today||0)+SP.today);$('#s2').textContent=fmt((sum.week||0)+SP.week);$('#s3').textContent=fmt((sum.month||0)+SP.month);
-  $('#ed').textContent=edit?'Done':'Edit prices';const pr=LS.getItem('ht_per')||'month',PLb={today:'Today',week:'This week',month:'This month'};$('#per').textContent=T(PLb[pr])+' ▾';$('#pv').textContent=({today:$('#s1'),week:$('#s2'),month:$('#s3')})[pr].textContent;$('#wb').innerHTML=wallets.map(w=>`<div class="wc"><span class="wi">${svg(wicon(w.name))}</span><small>${esc(w.name)}</small><b>${fmt(P.wallets[w.id])}</b></div>`).join('');
+  const sk='<div class="sk skt"></div>';
+  $('#bal').textContent=haveData?fmt(wallets.length?P.total:(sum.balance||0)):'…';
+  const sp=x=>haveData?fmt(x):'…';$('#s1').textContent=sp((sum.today||0)+SP.today);$('#s2').textContent=sp((sum.week||0)+SP.week);$('#s3').textContent=sp((sum.month||0)+SP.month);
+  $('#ed').textContent=edit?'Done':'Edit prices';const pr=LS.getItem('ht_per')||'month',PLb={today:'Today',week:'This week',month:'This month'};$('#per').textContent=T(PLb[pr])+' ▾';$('#pv').textContent=({today:$('#s1'),week:$('#s2'),month:$('#s3')})[pr].textContent;$('#wb').innerHTML=wallets.map(w=>`<div class="wc"><span class="wi">${svg(wicon(w.name))}</span><small>${esc(w.name)}</small><b class="${P.wallets[w.id]<0?'neg':''}" dir="auto">${fmt(P.wallets[w.id])}</b></div>`).join('');
   const qiAll=[...items.map(i=>{const p=q.find(o=>o.op==='qi'&&o.state==='pending'&&o.name.toLowerCase()===i.name.toLowerCase());return p?{...i,default_price:p.price}:i}),...q.filter(o=>o.op==='qi'&&o.state==='pending'&&!items.some(i=>i.name.toLowerCase()===o.name.toLowerCase())).map(o=>({id:'p'+o.qid,name:o.name,default_price:o.price,pending:1}))];
   $('#qi').innerHTML=qiAll.map(i=>`<button class="qc" data-i="${i.id}"><span class="qe">${Core.qicon(i.name)}</span><span><b>${esc(i.name)}</b><small>${fmt(i.default_price)}</small></span></button>`).join('');
   $('#qi').querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const it=qiAll.find(x=>x.id===b.dataset.i);if(!it)return;
-    if(edit){if(it.pending)return;const p=prompt(`Default price for ${it.name}`,it.default_price);if(p!==null&&p!==''&&num(p)>=0)sb.from('quick_items').update({default_price:Math.round(num(p)*100)/100}).eq('id',it.id).then(load)}
+    if(edit){if(it.pending)return;const p=prompt(`Default price for ${it.name}`,it.default_price);if(p!==null&&p!==''&&num(p)>=0)sb.from('quick_items').update({default_price:Math.round(num(p)*100)/100}).eq('id',it.id).then(r=>{if(r.error)notify(T('Could not save the price')+': '+r.error.message,true);load()})}
     else openSheet('expense',it.name,it.default_price)});
   const mine=q.filter(r=>!r.op&&r.state!=='conflict'&&r.household_id===hh.id).map(r=>({...r,id:r.client_id,pending:1,profiles:{name:'You'}}));
-  $('#tl').innerHTML=[...mine,...txs].slice(0,5).map(t=>trow(t,1)).join('')||'<p style="color:var(--mut)">No transactions yet. Withdraw cash to start.</p>';
-  $('#tl').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const x=txs.find(y=>y.id===b.dataset.d);x&&confirm(T('Delete this transaction?'))&&queueOp({op:'del',id:x.id,old:x})});
+  $('#tl').innerHTML=[...mine,...txs].slice(0,5).map(t=>trow(t,1)).join('')||(haveData?'<p style="color:var(--mut)">No transactions yet. Withdraw cash to start.</p>':sk+sk);
+  if(!haveData&&!qiAll.length)$('#qi').innerHTML='<div class="sk skt"></div><div class="sk skt"></div>';
+  $('#tl').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>askDelete(txs.find(y=>y.id===b.dataset.d)));
   $('#tl').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const x=txs.find(y=>y.id===b.dataset.e);x&&openSheet(x.type,'','',x)});
   netPaint();
 }
@@ -230,63 +308,81 @@ function openSheet(type,cat='',price='',tx=null){
 }
 function queueOp(o){o.household_id=hh.id;Qo.push(o);
   txs=o.op==='del'?txs.filter(x=>x.id!==o.id):txs.map(x=>x.id===o.id?{...x,...o.patch}:x);
-  LS.setItem('ht_c',JSON.stringify({sum,items,txs,wallets}));warnStore();paint();return flush().then(()=>{if(window.histRefresh&&$('#hl'))window.histRefresh(true)})}
+  cachePut();warnStore();paint();return flush().then(()=>{if(window.histRefresh&&$('#hl'))window.histRefresh(true)})}
 async function exec(o){
   if(o.op==='qi'){const x=await sb.rpc('upsert_quick_item',{h:o.household_id,n:o.name,p:o.price});return{error:x.error,status:x.status}}
   if(o.op==='del'){const x=await sb.from('transactions').delete().eq('id',o.id).select('id');if(x.error)return{error:x.error,status:x.status};
-    if(!x.data.length){const e=await sb.from('transactions').select('id').eq('id',o.id);if(e.data&&e.data.length)return{conflict:true,message:'You are not allowed to delete this entry.'}}
+    if(!x.data.length){const e=await sb.from('transactions').select('id').eq('id',o.id);if(e.error)return{error:e.error,status:e.status};if(e.data&&e.data.length)return{conflict:true,message:'You are not allowed to delete this entry.'}}
     return{}}
   if(o.op==='upd'){const x=await sb.from('transactions').update(o.patch).eq('id',o.id).eq('updated_at',o.base).select('id,updated_at');
     if(x.error)return{error:x.error,status:x.status};
-    if(!x.data.length)return{conflict:true,message:'This entry was changed or deleted on another device.'};
+    if(!x.data.length){const e=await sb.from('transactions').select('id,updated_at').eq('id',o.id);if(e.error)return{error:e.error,status:e.status};
+      if(e.data&&e.data.length&&e.data[0].updated_at===o.base)return{conflict:true,message:'You are not allowed to edit this entry.'};   // unchanged but not updatable = RLS, not a conflict
+      return{conflict:true,message:'This entry was changed or deleted on another device. Your edit was not applied.'}}
     return{updated_at:x.data[0].updated_at}}
   const row={client_id:o.client_id,household_id:o.household_id,user_id:o.uid,wallet_id:o.wallet_id,to_wallet_id:o.to_wallet_id,type:o.type,amount:o.amount,category:o.category,note:o.note,created_at:o.created_at};
   const x=await sb.from('transactions').upsert(row,{onConflict:'client_id',ignoreDuplicates:true});return{error:x.error,status:x.status}}
+/* every failure is reported against the operation that actually failed (never a generic "Could not save") */
+const FAILS={expense:'Expense sync failed',income:'Income sync failed',transfer:'Transfer sync failed',withdraw:'Withdrawal sync failed',deposit:'Deposit sync failed',upd:'Edit sync failed',del:'Delete sync failed',qi:'Quick purchase sync failed'};
+const opWhat=d=>d.name?` (${T(d.name)}${d.amount?' · '+fmt(d.amount):''})`:'';
+const failText=d=>T(FAILS[d.kind]||'Sync failed')+opWhat(d)+': '+T(d.message||'');
 let busy=false,again=false;
 async function flush(){
-  if(busy){again=true;return}if(!Qo||!navigator.onLine)return netPaint();busy=true;let r={};
-  try{r=await Core.sync(Qo,me,{online:()=>navigator.onLine,sessionUid:async()=>{const{data}=await sb.auth.getSession();return data&&data.session?data.session.user.id:null},exec});authLost=r.stopped==='auth'}
+  if(busy){again=true;return}if(!Qo||!navigator.onLine){netPaint();return}busy=true;let r={};const q0=Qo,u0=me;
+  try{r=await Core.sync(q0,u0,{online:()=>navigator.onLine,sessionUid:async()=>{const r=await timeout(sb.auth.getSession(),10000);if(!r)throw new Error('timeout');const{data,error}=r;   // a stuck lookup must never block the queue for good
+      if(data&&data.session)return data.session.user.id;
+      if(error&&storedUid())throw error;                          // could not be checked (network): not "signed out"
+      return null},exec});
+    if(u0===me)authLost=r.stopped==='auth'}
   finally{busy=false}
-  await load();(r.errors||[]).forEach(m=>notify(T('Could not save')+': '+m));if(r.conflict)notify(T('This entry was changed on another device. Your edit was not applied. The latest version is now shown.'));
+  if(u0!==me||!hh)return;                                          // logged out / switched account while syncing
+  const did=!!(r.synced||r.failed||r.conflict);if(did)await load();else netPaint();
+  const msgs=[...(r.errors||[]),...(r.conflicts||[])].map(failText);
+  if(msgs.length)notify(msgs[0]+(msgs.length>1?` (+${msgs.length-1} ${T('more — see Needs attention')})`:''),true);
   if(again){again=false;return flush()}
+  return did;
 }
+const KIND={del:'Delete',upd:'Edit',qi:'Quick purchase'};
 function syncView(){const v=$('#more'),L=Q().filter(o=>o.state==='failed'||o.state==='conflict');
-  v.innerHTML='<h2>Needs attention</h2>'+(L.map(o=>`<div class="tx"><div><b>${esc(o.op?(o.op==='del'?'Delete':'Edit'):(o.category||o.type))} ${o.amount?fmt(o.amount):''}</b><br><small>${esc(o.state)}: ${esc(o.err)}</small></div><div>${o.state==='failed'?`<button class="link" data-retry="${o.qid}">Retry</button> · `:''}<button class="link" data-discard="${o.qid}">Discard</button></div></div>`).join('')||'<p style="color:var(--mut)">All synced.</p>');
-  v.querySelectorAll('[data-retry]').forEach(b=>b.onclick=()=>{Qo.mark(b.dataset.retry,'pending','');flush().then(syncView)});
-  v.querySelectorAll('[data-discard]').forEach(b=>b.onclick=()=>{if(confirm(T('Discard this entry? A copy is kept on this device.'))){Qo.discard(b.dataset.discard);load().then(syncView)}})}
+  v.innerHTML='<h2>Needs attention</h2>'+(L.map(o=>{const d=Core.describe(o);return `<div class="tx"><div><b>${esc(KIND[d.kind]||TL[d.kind]||d.kind)}${d.name?' · '+esc(d.name):''} ${d.amount?fmt(d.amount):''}</b><br><small>${esc(T(FAILS[d.kind]||'Sync failed'))}: ${esc(o.err)}</small></div><div>${o.state==='failed'?`<button class="link" data-retry="${o.qid}">Retry</button> · `:''}<button class="link" data-discard="${o.qid}">Discard</button></div></div>`}).join('')||'<p style="color:var(--mut)">All synced.</p>');
+  v.querySelectorAll('[data-retry]').forEach(b=>b.onclick=()=>{Qo.mark(b.dataset.retry,'pending','');flush().then(()=>cur==='sync'&&syncView())});
+  v.querySelectorAll('[data-discard]').forEach(b=>b.onclick=()=>{if(confirm(T('Discard this entry? A copy is kept on this device.'))){Qo.discard(b.dataset.discard);load().then(()=>cur==='sync'&&syncView())}})}
 setInterval(()=>{if(Qo&&$('#bal')&&Q().some(o=>o.state==='pending'))flush()},30000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&hh&&Qo&&$('#bal')){loadSoon();flush()}});
-addEventListener('online',()=>flush());addEventListener('offline',()=>netPaint());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&hh&&Qo&&$('#bal')){if(!sessionOk)boot();loadSoon();flush()}});
+addEventListener('online',()=>{if(hh&&Qo&&$('#bal')){if(!sessionOk)boot();loadSoon();flush()}else if($('#rt'))boot()});addEventListener('offline',()=>netPaint());
 
 /* ---- Batch 1: Daily summary, Stats, History ---- */
 const day=d=>Core.cairoYmd(d);
 const need=()=>'<p style="color:var(--mut)">This screen needs an internet connection.</p>';
+const loadFail=e=>`<p class="err" style="margin-top:14px">${T('Could not load')}: ${esc((e&&e.message)||'')}</p><button class="btn alt" onclick="tab(cur)">${T('Try again')}</button>`;
 const bars=r=>{const m=Math.max(...r.map(x=>+x.total),1);return r.map(x=>`<div class="bi"><div class="bl"><span>${esc(x.name)}${x.n!=null?' · '+x.n+'×':''}</span><b>${fmt(x.total)}</b></div><div class="bt"><i style="width:${x.total/m*100}%"></i></div></div>`).join('')||'<p style="color:var(--mut)">Nothing yet.</p>'};
 const WI=n=>/bank/i.test(n)?'🏦':/personal/i.test(n)?'👤':/cash/i.test(n)?'💵':'👛';
 const wlab=id=>{const n=wn(id);return n?WI(n)+' '+esc(n):''};
 const TL={expense:'Expense',income:'Income',withdraw:'Withdraw',deposit:'Deposit',transfer:'Transfer'};
 const TI={income:['down','pos'],expense:['up','neg'],withdraw:['swap',''],deposit:['swap',''],transfer:['swap','']};
-const trow=(t,ctl)=>{const [ic,cl]=TI[t.type]||['swap',''];return `<div class="tx"><span class="ti ${cl}">${svg(ic)}</span><div class="tm"><b>${esc(t.category||t.type)}</b><small>${esc(t.profiles?.name||t.pname||(t.pending?'':T('Deleted user')))} · ${TL[t.type]||''} · ${new Date(t.created_at).toLocaleString((LG==='ar'?'ar-EG':'en-GB'),{timeZone:'Africa/Cairo',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${t.pending?(t.state==='failed'?' · NOT SYNCED':' · waiting to sync'):''}${t.note?' · '+esc(t.note):''}</small><small class="wl">${t.to_wallet_id?wlab(t.wallet_id)+' '+ARW+' '+wlab(t.to_wallet_id):wlab(t.wallet_id)}</small></div><div class="ta"><span class="amt ${t.type==='income'?'pos':t.type==='expense'?'neg':''}" ${ctl&&!t.pending?`data-e="${t.id}"`:''}>${t.type==='income'?'+':t.type==='expense'?'−':'⇄ '}${fmt(t.amount)}</span>${ctl&&!t.pending?`<button class="x" data-d="${t.id}" aria-label="Delete">×</button>`:''}</div></div>`};
-function tab(n){document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.n===n));$('#home').hidden=n!=='home';$('#more').hidden=n==='home';if(n!=='home')({daily:dailyView,stats:statsView,hist:histView,sync:syncView,house:houseView,account:accountView})[n]();scrollTo(0,0)}
+const trow=(t,ctl)=>{const [ic,cl]=TI[t.type]||['swap',''];ctl=ctl&&!t.pending&&canMod(t);return `<div class="tx"><span class="ti ${cl}">${svg(ic)}</span><div class="tm"><b>${esc(t.category||t.type)}</b><small>${esc(t.profiles?.name||t.pname||(t.pending?'':T(t.user_id?'Former member':'Deleted user')))} · ${TL[t.type]||''} · ${new Date(t.created_at).toLocaleString((LG==='ar'?'ar-EG':'en-GB'),{timeZone:'Africa/Cairo',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${t.pending?(t.state==='failed'?' · NOT SYNCED':' · waiting to sync'):''}${t.note?' · '+esc(t.note):''}</small><small class="wl">${t.to_wallet_id?wlab(t.wallet_id)+' '+ARW+' '+wlab(t.to_wallet_id):wlab(t.wallet_id)}</small></div><div class="ta"><span class="amt ${t.type==='income'?'pos':t.type==='expense'?'neg':''}" ${ctl?`data-e="${t.id}"`:''}>${t.type==='income'?'+':t.type==='expense'?'−':'⇄ '}${fmt(t.amount)}</span>${ctl?`<button class="x" data-d="${t.id}" aria-label="Delete">×</button>`:''}</div></div>`};
+function tab(n){document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('on',b.dataset.n===n));cur=n;$('#home').hidden=n!=='home';$('#more').hidden=n==='home';if(n!=='home'&&n!=='sync'&&n!=='account'&&navigator.onLine)$('#more').innerHTML='<div class="sk skt" style="margin-top:14px"></div><div class="sk skt"></div>';if(n!=='home')({daily:dailyView,stats:statsView,hist:histView,sync:syncView,house:houseView,account:accountView})[n]();scrollTo(0,0)}
 
 let dd=day(new Date());
 async function dailyView(){
   const v=$('#more');if(!navigator.onLine)return v.innerHTML=need();
   const a=Core.cairoStart(dd),b=Core.cairoStart(Core.addDays(dd,1));
   const [r,l]=await Promise.all([sb.rpc('range_stats',{h:hh.id,d1:dd,d2:dd}),sb.from('transactions').select('*,profiles(name)').eq('household_id',hh.id).eq('type','expense').gte('created_at',a).lt('created_at',b).order('created_at',{ascending:false})]);
+  if(cur!=='daily')return;                                        // the user moved to another tab while this was loading
+  if(r.error||l.error)return v.innerHTML=loadFail(r.error||l.error);
   const s=r.data||{by_member:[],top:[]},top=s.top[0];
-  v.innerHTML=`<div class="dn"><button id="pv">${LG==='ar'?'›':'‹'}</button><input id="dp" type="date" value="${dd}" style="width:auto"><button id="nx">${LG==='ar'?'‹':'›'}</button></div>
+  v.innerHTML=`<div class="dn"><button id="dpv" aria-label="Previous day">${LG==='ar'?'›':'‹'}</button><input id="dp" type="date" value="${dd}" style="width:auto"><button id="nx" aria-label="Next day">${LG==='ar'?'‹':'›'}</button></div>
   <div class="hero" style="margin:12px 0"><small>Household spending</small><div class="bal">${fmt(s.expenses)}</div><small>${s.count||0} purchases · ${T('Income')} ${fmt(s.income||0)}${top?` · biggest: ${esc(top.category)} ${fmt(top.amount)}`:''}</small></div>
   <h2>By person</h2>${bars(s.by_member)}<h2>By wallet</h2>${bars(byWallet(l.data||[]))}<h2>Purchases</h2>${(l.data||[]).map(t=>trow(t)).join('')||'<p style="color:var(--mut)">No purchases on this day.</p>'}`;
   const go=x=>{dd=x;dailyView()};
-  $('#pv').onclick=()=>go(Core.addDays(dd,-1));$('#nx').onclick=()=>go(Core.addDays(dd,1));$('#dp').onchange=e=>e.target.value&&go(e.target.value);
+  $('#dpv').onclick=()=>go(Core.addDays(dd,-1));$('#nx').onclick=()=>go(Core.addDays(dd,1));$('#dp').onchange=e=>e.target.value&&go(e.target.value);
 }
 
 let sr='month',cf=day(new Date()),ct=cf;
 async function statsView(){
   const v=$('#more');if(!navigator.onLine)return v.innerHTML=need();
   const P=Core.periods(Date.now());let a=P.today,b=P.today;if(sr==='week')a=P.week;if(sr==='month')a=P.month;if(sr==='custom'){a=cf;b=ct}if(a>b)[a,b]=[b,a];
-  const {data:s}=await sb.rpc('range_stats',{h:hh.id,d1:a,d2:b});if(!s)return;
+  const {data:s,error}=await sb.rpc('range_stats',{h:hh.id,d1:a,d2:b});if(cur!=='stats')return;if(error||!s)return v.innerHTML=loadFail(error);
   const mx=Math.max(...s.daily.map(x=>+x.total),1),freq=[...s.by_cat].sort((x,y)=>y.n-x.n).slice(0,5).map(x=>({...x,total:x.n}));
   v.innerHTML=`<div class="chips">${['today','week','month','custom'].map(r=>`<button data-r="${r}" class="${sr===r?'on':''}">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>
   ${sr==='custom'?`<div class="row"><input id="c1" type="date" value="${cf}"><input id="c2" type="date" value="${ct}"></div>`:''}
@@ -302,24 +398,25 @@ async function statsView(){
 const F={q:'',a:'',b:'',c:'',m:'',s:'created_at.desc'};
 async function histView(){
   const v=$('#more');if(!navigator.onLine)return v.innerHTML=need();
-  const {data:mem}=await sb.from('members').select('user_id,profiles(name)').eq('household_id',hh.id);
+  const {data:mem}=await sb.from('members').select('user_id,profiles(name)').eq('household_id',hh.id);if(cur!=='hist')return;
   const S=[['created_at.desc','Newest first'],['created_at.asc','Oldest first'],['amount.desc','Highest amount'],['amount.asc','Lowest amount']];
   v.innerHTML=`<input id="fq" placeholder="Search" value="${esc(F.q)}"><div class="row"><input id="fa" type="date" value="${F.a}"><input id="fb" type="date" value="${F.b}"></div>
   <select id="fc"><option value="">All categories</option>${items.map(i=>`<option value="${esc(i.name)}" ${F.c===i.name?'selected':''}>${esc(i.name)}</option>`).join('')}</select>
-  <select id="fm"><option value="">Everyone</option>${(mem||[]).map(m=>`<option value="${m.user_id}" ${F.m===m.user_id?'selected':''}>${esc(m.profiles?.name)}</option>`).join('')}</select>
+  <select id="fm"><option value="">Everyone</option>${(mem||[]).map(m=>`<option value="${m.user_id}" ${F.m===m.user_id?'selected':''}>${esc(m.profiles?.name)}</option>`).join('')}<option value="~deleted" ${F.m==='~deleted'?'selected':''}>${T('Deleted user')}</option></select>
   <select id="fs">${S.map(o=>`<option value="${o[0]}" ${F.s===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select><div id="hl" style="margin-top:10px"></div>`;
   const PAGE=50;let hrows=[];
   const run=async(reset=true)=>{
     let q=sb.from('transactions').select('*,profiles(name)').eq('household_id',hh.id);
     const t=F.q.replace(/[,()%*]/g,'');if(t)q=q.or(`category.ilike.%${t}%,note.ilike.%${t}%`);
     if(F.a)q=q.gte('created_at',Core.cairoStart(F.a));if(F.b)q=q.lt('created_at',Core.cairoStart(Core.addDays(F.b,1)));
-    if(F.c)q=q.eq('category',F.c);if(F.m)q=q.eq('user_id',F.m);
+    if(F.c)q=q.eq('category',F.c);if(F.m==='~deleted')q=q.is('user_id',null);else if(F.m)q=q.eq('user_id',F.m);
     const [col,dir]=F.s.split('.'),from=reset?0:hrows.length;
     const {data,error}=await q.order(col,{ascending:dir==='asc'}).order('id').range(from,from+PAGE-1);
+    if(cur!=='hist'||!$('#hl'))return;
     if(error)return $('#hl').innerHTML=`<p class="err">${esc(error.message)}</p>`;
     hrows=reset?data:[...hrows,...data];
     $('#hl').innerHTML=(hrows.map(t=>trow(t,1)).join('')||'<p style="color:var(--mut)">No matching transactions.</p>')+(data.length===PAGE?'<button class="btn alt" id="lm">Load more</button>':'');
-    $('#hl').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const x=hrows.find(y=>y.id===b.dataset.d);x&&confirm(T('Delete this transaction?'))&&queueOp({op:'del',id:x.id,old:x})});
+    $('#hl').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>askDelete(hrows.find(y=>y.id===b.dataset.d)));
     $('#hl').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const x=hrows.find(y=>y.id===b.dataset.e);x&&openSheet(x.type,'','',x)});
     window.histRefresh=run;if($('#lm'))$('#lm').onclick=()=>run(false);
   };
@@ -328,7 +425,7 @@ async function histView(){
 }
 
 
-const AR={"Settings":"الإعدادات","View all":"عرض الكل","Account":"الحساب","By wallet":"حسب المحفظة","Amount":"المبلغ","Wallet":"المحفظة","Description":"الوصف","Note":"ملاحظة","Deleted user":"مستخدم محذوف","Save Expense + Add to Quick Purchases":"حفظ المصروف + إضافة للمشتريات السريعة","Add to Quick Purchases Only":"إضافة للمشتريات السريعة فقط","Quick Purchase default price":"السعر الافتراضي للمشترى السريع","Enter the item name":"أدخل اسم الصنف","Enter a default price":"أدخل السعر الافتراضي","Added to Quick Purchases":"تمت الإضافة للمشتريات السريعة","Delete your account?":"حذف حسابك؟","This permanently deletes your account and cannot be undone.":"سيتم حذف حسابك نهائياً ولا يمكن التراجع.","Delete My Account":"حذف حسابي","Type DELETE to confirm":"اكتب DELETE للتأكيد","Internet connection required to delete your account.":"يلزم اتصال بالإنترنت لحذف حسابك.","Your account was deleted.":"تم حذف حسابك.","If you own a household that still has other members, remove them or delete the household first. If you are the only member, the household is deleted with your account. Entries you added in other households stay in their history as Deleted user.":"إذا كنت تملك أسرة بها أعضاء آخرون فأزلهم أو احذف الأسرة أولاً. إذا كنت العضو الوحيد تُحذف الأسرة مع حسابك. تبقى إدخالاتك في الأسر الأخرى في السجل باسم مستخدم محذوف.","Household":"الأسرة","Members":"الأعضاء","Member":"عضو","Owner":"المالك","Remove member":"إزالة عضو","Delete Household":"حذف الأسرة","Danger zone":"منطقة الخطر","Add to Quick Purchases":"إضافة إلى المشتريات السريعة","Default price":"السعر الافتراضي","Withdraw":"سحب","Deposit":"إيداع","Could not save":"تعذر الحفظ","Insufficient funds. Available balance":"الرصيد غير كافٍ. الرصيد المتاح","It will be checked again when you reconnect. Save anyway?":"سيتم التحقق مرة أخرى عند عودة الاتصال. هل تريد الحفظ؟","You no longer have access to this household.":"لم يعد لديك صلاحية الوصول إلى هذه الأسرة.","Household deleted.":"تم حذف الأسرة.","They lose access immediately. Their account and past transactions are kept.":"يفقد الوصول فوراً. يبقى حسابه ومعاملاته السابقة.","Type the household name to confirm":"اكتب اسم الأسرة للتأكيد","Delete this household? This removes the household and removes ALL members from it. Wallets, transactions and quick purchases are deleted. This cannot be undone. Your account is kept.":"حذف هذه الأسرة؟ سيتم حذف الأسرة وإزالة جميع الأعضاء منها مع المحافظ والمعاملات والمشتريات السريعة. لا يمكن التراجع. يبقى حسابك.","Needs attention":"تحتاج إلى انتباه","Retry":"إعادة المحاولة","Discard":"تجاهل","Load more":"تحميل المزيد","Category":"الفئة","Edit":"تعديل","All synced.":"تمت مزامنة كل شيء.","NOT SYNCED":"لم تتم المزامنة","Discard this entry? A copy is kept on this device.":"تجاهل هذا الإدخال؟ تبقى نسخة منه على هذا الجهاز.","This entry was changed on another device. Your edit was not applied. The latest version is now shown.":"تم تعديل هذا الإدخال من جهاز آخر. لم يتم تطبيق تعديلك. يتم عرض آخر نسخة الآن.","Can't reach the server":"تعذر الوصول إلى الخادم","Try again":"حاول مرة أخرى","Private mode detected: you will be logged out every time. Open the site in a normal tab.":"الوضع الخاص مفعّل: سيتم تسجيل خروجك في كل مرة. افتح الموقع في تبويب عادي.","Not enough in this wallet. Save anyway?":"الرصيد في هذه المحفظة لا يكفي. هل تريد الحفظ على أي حال؟","Household Tracker": "متتبع المنزل", "Every purchase, one tap.": "كل مشترياتك بنقرة واحدة.", "Your name (new accounts)": "اسمك (للحسابات الجديدة)", "Email": "البريد الإلكتروني", "Password": "كلمة المرور", "Log in": "تسجيل الدخول", "Create account": "إنشاء حساب", "Forgot password?": "نسيت كلمة المرور؟", "Check your email to confirm, then log in.": "تحقق من بريدك للتأكيد ثم سجل الدخول.", "Reset link sent to your email.": "أُرسل رابط الاستعادة إلى بريدك.", "Your household": "أسرتك", "Start a new one, or join with a code.": "أنشئ أسرة جديدة أو انضم برمز.", "Household name": "اسم الأسرة", "Create household": "إنشاء أسرة", "Invitation code": "رمز الدعوة", "Join household": "الانضمام للأسرة", "Log out": "تسجيل الخروج", "Invite code:": "رمز الدعوة:", "Online": "متصل", "Offline": "غير متصل", "waiting to sync": "بانتظار المزامنة", "waiting": "بالانتظار", "Syncing": "مزامنة", "Total balance": "الرصيد الإجمالي", "Today": "اليوم", "This week": "هذا الأسبوع", "This month": "هذا الشهر", "Withdraw cash": "سحب نقدي", "Bank → household cash": "من البنك إلى النقدية", "Add income": "إضافة دخل", "Quick purchases": "مشتريات سريعة", "Edit prices": "تعديل الأسعار", "Done": "تم", "Custom expense": "مصروف آخر", "Cash back to bank": "إيداع في البنك", "Recent": "الأخيرة", "Transfer": "تحويل", "Home": "الرئيسية", "Daily":"اليوم", "Stats":"الإحصائيات", "History": "السجل", "Save": "حفظ", "Cancel": "إلغاء", "Note (optional)": "ملاحظة (اختياري)", "What was it?": "ما هو؟", "Expense": "مصروف", "Bread": "عيش", "Fish": "سمك", "Chicken": "فراخ", "Meat": "لحمة", "Rice": "أرز", "Vegetables": "خضار", "Fruits": "فاكهة", "Milk": "لبن", "Eggs": "بيض", "Other groceries": "بقالة أخرى", "Household cash": "نقدية المنزل", "Bank account": "حساب بنكي", "Personal cash": "نقدية شخصية", "Spent": "المصروف", "Income": "الدخل", "Search": "بحث", "All categories": "كل الفئات", "Everyone": "الجميع", "Newest first": "الأحدث أولاً", "Oldest first": "الأقدم أولاً", "Highest amount": "الأعلى مبلغاً", "Lowest amount": "الأقل مبلغاً", "Week": "أسبوع", "Month": "شهر", "Custom": "مخصص", "Spending per day": "الصرف اليومي", "By category": "حسب الفئة", "By person": "حسب الشخص", "Most bought": "الأكثر شراءً", "Biggest purchases": "أكبر المشتريات", "Purchases": "المشتريات", "Household spending": "مصروف الأسرة", "Nothing yet.": "لا شيء بعد.", "No transactions yet. Withdraw cash to start.": "لا توجد معاملات بعد. اسحب نقداً للبدء.", "No matching transactions.": "لا توجد نتائج.", "No purchases on this day.": "لا مشتريات في هذا اليوم.", "You": "أنت", "This screen needs an internet connection.": "هذه الشاشة تحتاج إلى إنترنت.", "Delete this transaction?": "حذف هذه المعاملة؟", "New amount": "المبلغ الجديد", "Choose two different wallets": "اختر محفظتين مختلفتين", "Changed on another device. Your edit was skipped.": "تم التعديل من جهاز آخر. تم تجاهل تعديلك.", "purchases": "مشتريات", "biggest:": "الأكبر:"
+const AR={"Settings":"الإعدادات","View all":"عرض الكل","Account":"الحساب","By wallet":"حسب المحفظة","Amount":"المبلغ","Wallet":"المحفظة","Description":"الوصف","Note":"ملاحظة","Deleted user":"مستخدم محذوف","Former member":"عضو سابق","Updating…":"جارٍ التحديث…","Loading…":"جارٍ التحميل…","Saved data":"بيانات محفوظة","Couldn't refresh. Showing saved data. Tap to retry.":"تعذر التحديث. تُعرض البيانات المحفوظة. اضغط لإعادة المحاولة.","Expense sync failed":"فشلت مزامنة المصروف","Income sync failed":"فشلت مزامنة الدخل","Transfer sync failed":"فشلت مزامنة التحويل","Withdrawal sync failed":"فشلت مزامنة السحب","Deposit sync failed":"فشلت مزامنة الإيداع","Edit sync failed":"فشلت مزامنة التعديل","Delete sync failed":"فشلت مزامنة الحذف","Quick purchase sync failed":"فشلت مزامنة المشترى السريع","Sync failed":"فشلت المزامنة","more — see Needs attention":"أخرى — راجع «تحتاج إلى مراجعة»","You are not allowed to delete this entry.":"غير مسموح لك بحذف هذا الإدخال.","You are not allowed to edit this entry.":"غير مسموح لك بتعديل هذا الإدخال.","This entry was changed or deleted on another device. Your edit was not applied.":"تم تغيير أو حذف هذا الإدخال من جهاز آخر. لم يُطبَّق تعديلك.","This entry added money that has already been spent, so deleting it will leave a negative balance":"هذا الإدخال أضاف مالاً تم صرفه بالفعل، وحذفه سيجعل الرصيد بالسالب","Quick purchase":"مشترى سريع","Delete":"حذف","Could not load":"تعذر التحميل","Could not save the price":"تعذر حفظ السعر","Your session expired. Log in again. Your unsynced entries are kept on this device.":"انتهت الجلسة. سجّل الدخول مرة أخرى. إدخالاتك غير المُزامَنة محفوظة على هذا الجهاز.","The server is taking too long to answer.":"الخادم يستغرق وقتاً طويلاً للرد.","Save Expense + Add to Quick Purchases":"حفظ المصروف + إضافة للمشتريات السريعة","Add to Quick Purchases Only":"إضافة للمشتريات السريعة فقط","Quick Purchase default price":"السعر الافتراضي للمشترى السريع","Enter the item name":"أدخل اسم الصنف","Enter a default price":"أدخل السعر الافتراضي","Added to Quick Purchases":"تمت الإضافة للمشتريات السريعة","Delete your account?":"حذف حسابك؟","This permanently deletes your account and cannot be undone.":"سيتم حذف حسابك نهائياً ولا يمكن التراجع.","Delete My Account":"حذف حسابي","Type DELETE to confirm":"اكتب DELETE للتأكيد","Internet connection required to delete your account.":"يلزم اتصال بالإنترنت لحذف حسابك.","Your account was deleted.":"تم حذف حسابك.","If you own a household that still has other members, remove them or delete the household first. If you are the only member, the household is deleted with your account. Entries you added in other households stay in their history as Deleted user.":"إذا كنت تملك أسرة بها أعضاء آخرون فأزلهم أو احذف الأسرة أولاً. إذا كنت العضو الوحيد تُحذف الأسرة مع حسابك. تبقى إدخالاتك في الأسر الأخرى في السجل باسم مستخدم محذوف.","Household":"الأسرة","Members":"الأعضاء","Member":"عضو","Owner":"المالك","Remove member":"إزالة عضو","Delete Household":"حذف الأسرة","Danger zone":"منطقة الخطر","Add to Quick Purchases":"إضافة إلى المشتريات السريعة","Default price":"السعر الافتراضي","Withdraw":"سحب","Deposit":"إيداع","Could not save":"تعذر الحفظ","Insufficient funds. Available balance":"الرصيد غير كافٍ. الرصيد المتاح","It will be checked again when you reconnect. Save anyway?":"سيتم التحقق مرة أخرى عند عودة الاتصال. هل تريد الحفظ؟","You no longer have access to this household.":"لم يعد لديك صلاحية الوصول إلى هذه الأسرة.","Household deleted.":"تم حذف الأسرة.","They lose access immediately. Their account and past transactions are kept.":"يفقد الوصول فوراً. يبقى حسابه ومعاملاته السابقة.","Type the household name to confirm":"اكتب اسم الأسرة للتأكيد","Delete this household? This removes the household and removes ALL members from it. Wallets, transactions and quick purchases are deleted. This cannot be undone. Your account is kept.":"حذف هذه الأسرة؟ سيتم حذف الأسرة وإزالة جميع الأعضاء منها مع المحافظ والمعاملات والمشتريات السريعة. لا يمكن التراجع. يبقى حسابك.","Needs attention":"تحتاج إلى انتباه","Retry":"إعادة المحاولة","Discard":"تجاهل","Load more":"تحميل المزيد","Category":"الفئة","Edit":"تعديل","All synced.":"تمت مزامنة كل شيء.","NOT SYNCED":"لم تتم المزامنة","Discard this entry? A copy is kept on this device.":"تجاهل هذا الإدخال؟ تبقى نسخة منه على هذا الجهاز.","This entry was changed on another device. Your edit was not applied. The latest version is now shown.":"تم تعديل هذا الإدخال من جهاز آخر. لم يتم تطبيق تعديلك. يتم عرض آخر نسخة الآن.","Can't reach the server":"تعذر الوصول إلى الخادم","Try again":"حاول مرة أخرى","Private mode detected: you will be logged out every time. Open the site in a normal tab.":"الوضع الخاص مفعّل: سيتم تسجيل خروجك في كل مرة. افتح الموقع في تبويب عادي.","Not enough in this wallet. Save anyway?":"الرصيد في هذه المحفظة لا يكفي. هل تريد الحفظ على أي حال؟","Household Tracker": "متتبع المنزل", "Every purchase, one tap.": "كل مشترياتك بنقرة واحدة.", "Your name (new accounts)": "اسمك (للحسابات الجديدة)", "Email": "البريد الإلكتروني", "Password": "كلمة المرور", "Log in": "تسجيل الدخول", "Create account": "إنشاء حساب", "Forgot password?": "نسيت كلمة المرور؟", "Check your email to confirm, then log in.": "تحقق من بريدك للتأكيد ثم سجل الدخول.", "Reset link sent to your email.": "أُرسل رابط الاستعادة إلى بريدك.", "Your household": "أسرتك", "Start a new one, or join with a code.": "أنشئ أسرة جديدة أو انضم برمز.", "Household name": "اسم الأسرة", "Create household": "إنشاء أسرة", "Invitation code": "رمز الدعوة", "Join household": "الانضمام للأسرة", "Log out": "تسجيل الخروج", "Invite code:": "رمز الدعوة:", "Online": "متصل", "Offline": "غير متصل", "waiting to sync": "بانتظار المزامنة", "waiting": "بالانتظار", "Syncing": "مزامنة", "Total balance": "الرصيد الإجمالي", "Today": "اليوم", "This week": "هذا الأسبوع", "This month": "هذا الشهر", "Withdraw cash": "سحب نقدي", "Bank → household cash": "من البنك إلى النقدية", "Add income": "إضافة دخل", "Quick purchases": "مشتريات سريعة", "Edit prices": "تعديل الأسعار", "Done": "تم", "Custom expense": "مصروف آخر", "Cash back to bank": "إيداع في البنك", "Recent": "الأخيرة", "Transfer": "تحويل", "Home": "الرئيسية", "Daily":"اليوم", "Stats":"الإحصائيات", "History": "السجل", "Save": "حفظ", "Cancel": "إلغاء", "Note (optional)": "ملاحظة (اختياري)", "What was it?": "ما هو؟", "Expense": "مصروف", "Bread": "عيش", "Fish": "سمك", "Chicken": "فراخ", "Meat": "لحمة", "Rice": "أرز", "Vegetables": "خضار", "Fruits": "فاكهة", "Milk": "لبن", "Eggs": "بيض", "Other groceries": "بقالة أخرى", "Household cash": "نقدية المنزل", "Bank account": "حساب بنكي", "Personal cash": "نقدية شخصية", "Spent": "المصروف", "Income": "الدخل", "Search": "بحث", "All categories": "كل الفئات", "Everyone": "الجميع", "Newest first": "الأحدث أولاً", "Oldest first": "الأقدم أولاً", "Highest amount": "الأعلى مبلغاً", "Lowest amount": "الأقل مبلغاً", "Week": "أسبوع", "Month": "شهر", "Custom": "مخصص", "Spending per day": "الصرف اليومي", "By category": "حسب الفئة", "By person": "حسب الشخص", "Most bought": "الأكثر شراءً", "Biggest purchases": "أكبر المشتريات", "Purchases": "المشتريات", "Household spending": "مصروف الأسرة", "Nothing yet.": "لا شيء بعد.", "No transactions yet. Withdraw cash to start.": "لا توجد معاملات بعد. اسحب نقداً للبدء.", "No matching transactions.": "لا توجد نتائج.", "No purchases on this day.": "لا مشتريات في هذا اليوم.", "You": "أنت", "This screen needs an internet connection.": "هذه الشاشة تحتاج إلى إنترنت.", "Delete this transaction?": "حذف هذه المعاملة؟", "New amount": "المبلغ الجديد", "Choose two different wallets": "اختر محفظتين مختلفتين", "Changed on another device. Your edit was skipped.": "تم التعديل من جهاز آخر. تم تجاهل تعديلك.", "purchases": "مشتريات", "biggest:": "الأكبر:"
 ,"New here? Create account":"جديد؟ أنشئ حساباً","I already have an account":"لدي حساب بالفعل","Use your own email. Each family member needs their own account.":"استخدم بريدك الخاص. كل فرد من الأسرة يحتاج حسابه.","Your name":"اسمك","Password (6+ characters)":"كلمة المرور (6 أحرف على الأقل)","Resend confirmation email":"إعادة إرسال رسالة التأكيد","Resend in":"إعادة الإرسال خلال","Confirmation email sent.":"أُرسلت رسالة التأكيد.","Enter your email first.":"أدخل بريدك أولاً."};
 const KEYS=Object.keys(AR).sort((a,b)=>b.length-a.length);
 const T=x=>LG==='ar'?KEYS.reduce((v,k)=>v.includes(k)?v.split(k).join(AR[k]):v,x):x;
@@ -341,11 +438,11 @@ const uuid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xx
 const MV=['withdraw','deposit','transfer'];
 const wn=id=>(wallets.find(w=>w.id===id)||{}).name||'';
 const bal=()=>Core.balances(wallets,Q(),(wallets[0]||{}).id).wallets;
-function afterLoss(msg){LS.removeItem('ht_hh');LS.removeItem('ht_c');hh=null;if(ch){try{sb.removeChannel(ch)}catch(e){}ch=null}notify(T(msg));boot()}
+function afterLoss(msg){LS.removeItem('ht_hh');LS.removeItem('ht_c');hh=null;dropDash();resetState();shellView();notify(T(msg));boot()}
 const lostAccess=()=>afterLoss('You no longer have access to this household.');
 async function houseView(){
   const v=$('#more');if(!navigator.onLine)return v.innerHTML=need();
-  const {data:mem}=await sb.from('members').select('user_id,role,profiles(name)').eq('household_id',hh.id).order('role');
+  const {data:mem,error:merr}=await sb.from('members').select('user_id,role,profiles(name)').eq('household_id',hh.id).order('role');if(cur!=='house')return;if(merr)return v.innerHTML=loadFail(merr);
   const owner=(mem||[]).some(m=>m.user_id===me&&m.role==='owner');
   v.innerHTML=`<h2>${esc(hh.name)}</h2><p style="color:var(--mut)">${T('Invite code:')} <b>${esc(hh.invite_code)}</b></p><h2>Members</h2>`+
    (mem||[]).map(m=>`<div class="tx"><div><b>${esc(m.profiles?.name||'')}</b>${m.user_id===me?' (you)':''}<br><small>${m.role==='owner'?'Owner':'Member'}</small></div>${owner&&m.user_id!==me?`<button class="link danger" data-rm="${m.user_id}" data-n="${esc(m.profiles?.name||'')}">Remove member</button>`:''}</div>`).join('')+
@@ -361,7 +458,7 @@ async function houseView(){
 const SV={home:'M3 11l9-8 9 8M5 10v10h14V10',calendar:'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',chart:'M5 20V10M12 20V4M19 20v-7',list:'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',gear:'M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6',plus:'M12 5v14M5 12h14',go:'M7 17L17 7M8 7h9v9',wallet:'M3 7h15a3 3 0 013 3v8H6a3 3 0 01-3-3zM3 7V6a2 2 0 012-2h11M16 13h3',bank:'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18',user:'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6',down:'M12 5v14M6 13l6 6 6-6',up:'M12 19V5M6 11l6-6 6 6',swap:'M7 7h12l-3-3M17 17H5l3 3'};
 const svg=(n,c='')=>`<svg class="${c}" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${SV[n]}"/></svg>`;
 const ARW=LG==='ar'?'←':'→';const wicon=n=>/bank/i.test(n)?'bank':/personal/i.test(n)?'user':'wallet';
-function notify(m){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');document.body.appendChild(t)}t.textContent=m;t.className='on'+(/insufficient|could not|error|not allowed|expired|required|match|own a household|must be/i.test(m)?' bad':'');clearTimeout(notify.t);notify.t=setTimeout(()=>{t.className=''},4500)}
+function notify(m,bad){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');document.body.appendChild(t)}t.textContent=m;t.className='on'+(bad||/insufficient|could not|error|failed|not allowed|expired|required|match|own a household|must be/i.test(m)?' bad':'');clearTimeout(notify.t);notify.t=setTimeout(()=>{t.className=''},bad?7000:4500)}
 const walletRows=()=>{const B=Core.balances(wallets,Q(),(wallets[0]||{}).id).wallets;return wallets.map(w=>({name:w.name,total:Math.max(0,B[w.id]||0)}))};
 const byWallet=rows=>{const m={};rows.forEach(r=>{const n=wn(r.wallet_id)||'?';m[n]=m[n]||{name:n,total:0,n:0};m[n].total+=+r.amount;m[n].n++});return Object.values(m).sort((a,b)=>b.total-a.total)};
 async function accountView(){const v=$('#more');
@@ -370,19 +467,24 @@ async function accountView(){const v=$('#more');
   $('#dd').onclick=async()=>{if($('#dc').value.trim()!=='DELETE')return;
     if(!navigator.onLine)return notify(T('Internet connection required to delete your account.'));
     $('#dd').disabled=true;const {error}=await sb.rpc('delete_my_account',{confirm_text:'DELETE'});
-    if(error){$('#de').textContent=error.message;$('#dd').disabled=false;return notify(error.message)}
-    const uid=me;try{Qo.all().forEach(o=>Qo.remove(o.qid));LS.removeItem('ht_trash:'+uid)}catch(e){}
-    loggingOut=true;LS.removeItem('ht_hh');LS.removeItem('ht_c');hh=null;me=null;Qo=null;try{await sb.auth.signOut({scope:'local'})}catch(e){}
-    notify(T('Your account was deleted.'));boot()};
+    if(error){$('#de').textContent=error.message;$('#dd').disabled=false;return notify(error.message,true)}
+    const uid=me;try{Qo.all().forEach(o=>Qo.remove(o.qid));LS.removeItem('ht_trash:'+uid);if(LS.getItem('ht_last_uid')===uid)LS.removeItem('ht_last_uid')}catch(e){}
+    loggingOut=true;bootSeq++;dropDash();LS.removeItem('ht_hh');LS.removeItem('ht_c');hh=null;me=null;Qo=null;sessionOk=false;resetState();
+    try{await timeout(sb.auth.signOut({scope:'local'}),5000)}catch(e){}
+    if(storedUid()){try{localStorage.removeItem('ht-auth')}catch(e){}}   // the account no longer exists: never keep its token on the device
+    authView(T('Your account was deleted.'))};
 }
-if('serviceWorker' in navigator){const had=!!navigator.serviceWorker.controller;let rl=0;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!rl){rl=1;location.reload()}});navigator.serviceWorker.register('sw.js')}
+if('serviceWorker' in navigator){const had=!!navigator.serviceWorker.controller;let rl=0;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!rl){rl=1;location.reload()}});navigator.serviceWorker.register('sw.js').catch(()=>{})}
 boot();
 </script>
 <script>
-(function(){var done=0,fails=0,S=['supabase.min.js','https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js','https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js','https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js'];
+(function(){var done=0,fails=0,LOCAL='supabase.min.js',S=['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js','https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js','https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js'];
 function go(){if(done)return;done=1;var e=document.createElement('script');e.textContent=document.getElementById('appjs').textContent;document.body.appendChild(e)}
 function bad(){if(++fails>=S.length&&!done)document.getElementById('app').innerHTML='<p style="padding:30px;font:18px system-ui">The app could not load. Check your internet connection, try Wi-Fi or mobile data, then reload.</p>'}
-S.forEach(function(u){var e=document.createElement('script');e.src=u;e.async=true;e.onload=function(){window.supabase?go():bad()};e.onerror=bad;document.head.appendChild(e)});
+function add(u,ok,err){var e=document.createElement('script');e.src=u;e.async=true;e.onload=ok;e.onerror=err;document.head.appendChild(e)}
+function cdn(){S.forEach(function(u){add(u,function(){window.supabase?go():bad()},bad)})}
+/* same-origin copy first (precached by the service worker: no third-party DNS/TLS on startup, works offline); CDNs only as fallback */
+add(LOCAL,function(){window.supabase?go():cdn()},cdn);
 })();
 </script>
 </body></html>

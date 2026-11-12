@@ -1,0 +1,247 @@
+// UI / startup / offline tests in a real (headless) Chromium. The app files are served unchanged from the repository;
+// only supabase.min.js is replaced by tests/mock-supabase.js (a fake backend whose latency and failures we control).
+//   node tests/ui.test.mjs            (screenshots are written to tests/screenshots/)
+import http from 'node:http';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import zlib from 'node:zlib';
+import {execFileSync,execSync} from 'node:child_process';
+import {test,eq,ok,done,ROOT} from './harness.mjs';
+import chromium from '@sparticuz/chromium';import puppeteer from 'puppeteer-core';
+const SHOTS=path.join(ROOT,'tests','screenshots');fs.mkdirSync(SHOTS,{recursive:true});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- static server ---------- */
+const TYPES={'.html':'text/html; charset=utf-8','.js':'text/javascript','.json':'application/json','.png':'image/png'};
+const srv={noSW:true,dead:false};let OLD='';try{OLD=execSync('git show 7cdc7d7:index.html',{cwd:ROOT,maxBuffer:1e8}).toString()}catch(e){}
+const server=http.createServer((q,r)=>{if(srv.dead)return q.socket.destroy();
+  let u=decodeURIComponent(q.url.split('?')[0]);if(u==='/')u='/index.html';
+  if(u==='/old.html'&&OLD){r.writeHead(200,{'content-type':TYPES['.html']});return r.end(OLD)}                      // the version before this change, for layout comparison
+  if(u==='/sw.js'&&srv.noSW){r.writeHead(404);return r.end()}
+  const f=u==='/supabase.min.js'?path.join(ROOT,'tests','mock-supabase.js'):path.join(ROOT,u);
+  if(!f.startsWith(ROOT)||!fs.existsSync(f)||fs.statSync(f).isDirectory()){r.writeHead(404);return r.end('not found')}
+  r.writeHead(200,{'content-type':TYPES[path.extname(f)]||'application/octet-stream','cache-control':'no-store'});r.end(fs.readFileSync(f))});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));const BASE=`http://localhost:${server.address().port}/`;
+
+/* ---------- browser (bundled Chromium + the shared libraries it needs) ---------- */
+const libs=path.join(os.tmpdir(),'ht-chromium-libs');
+if(!fs.existsSync(path.join(libs,'lib'))){fs.mkdirSync(libs,{recursive:true});const tar=path.join(libs,'l.tar');
+  fs.writeFileSync(tar,zlib.brotliDecompressSync(fs.readFileSync(path.join(ROOT,'node_modules','@sparticuz','chromium','bin','al2023.tar.br'))));execFileSync('tar',['-xf',tar,'-C',libs])}
+const browser=await puppeteer.launch({args:[...chromium.args.filter(a=>!/single-process|no-zygote/.test(a)),'--font-render-hinting=none'],executablePath:await chromium.executablePath(),headless:'shell',
+  env:{...process.env,LD_LIBRARY_PATH:[path.join(libs,'lib'),process.env.LD_LIBRARY_PATH].filter(Boolean).join(':')}});
+
+/* ---------- fake database ---------- */
+const O='00000000-0000-4000-8000-00000000000a',M='00000000-0000-4000-8000-00000000000b',H='00000000-0000-4000-8000-0000000000aa';
+const WC='00000000-0000-4000-8000-0000000000c1',WB='00000000-0000-4000-8000-0000000000c2',WP='00000000-0000-4000-8000-0000000000c3';
+let n=0;const tx=(user_id,type,amount,wallet_id,to_wallet_id,category,min)=>{n++;const at=new Date(Date.now()-min*60000).toISOString();return{id:`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`,client_id:'c'+n,household_id:H,user_id,type,amount,wallet_id,to_wallet_id:to_wallet_id||null,category,note:'',created_at:at,updated_at:at}};
+const seed=()=>{n=0;return{users:[{id:O,email:'owner@t.io',password:'secret1',name:'Omar'},{id:M,email:'mona@t.io',password:'secret1',name:'Mona'}],
+  households:[{id:H,name:'Home',invite_code:'abcd1234'}],members:[{household_id:H,user_id:O,role:'owner'},{household_id:H,user_id:M,role:'member'}],
+  wallets:[{id:WC,household_id:H,name:'Household cash',is_default:true},{id:WB,household_id:H,name:'Bank account'},{id:WP,household_id:H,name:'Personal cash'}],
+  quick_items:['Bread:20','Chicken:180','Fish:250','Milk:50','Rice:40','Vegetables:60'].map((x,i)=>({id:'q'+i,household_id:H,name:x.split(':')[0],default_price:+x.split(':')[1]})),
+  transactions:[tx(O,'income',1000,WB,null,'Add income',600),tx(O,'withdraw',500,WB,WC,'Withdraw cash',500),
+    tx(null,'transfer',200,WC,WP,'Transfer',400),      // made by an account that was deleted later  -> id ...003
+    tx(null,'expense',190,WP,null,'Fish',300),         // deleted user's purchase: Personal cash is now 10 -> id ...004
+    tx(M,'expense',20,WC,null,'Bread',200),tx(O,'expense',60,WC,null,'Vegetables',100)]}};      // Mona's -> ...005, Omar's -> ...006
+const T_TRANSFER='00000000-0000-4000-8000-000000000003',T_BREAD='00000000-0000-4000-8000-000000000005',T_VEG='00000000-0000-4000-8000-000000000006';
+const session=uid=>JSON.stringify({access_token:'tok',refresh_token:'r',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:uid}});
+const VP={iphone:{width:390,height:844,deviceScaleFactor:2,isMobile:true,hasTouch:true},android:{width:360,height:800,deviceScaleFactor:2,isMobile:true,hasTouch:true},ipad:{width:820,height:1180,deviceScaleFactor:1,isMobile:true,hasTouch:true}};
+
+async function open({uid=null,lang='en',vp='iphone',cfg={},url='',inset=0,standalone=false,offline=false}={}){
+  const ctx=await browser.createBrowserContext(),page=await ctx.newPage();await page.setViewport(VP[vp]);
+  const dialogs=[];page.on('dialog',async d=>{dialogs.push(d.message());await d.accept()});
+  const errors=[];page.on('pageerror',e=>errors.push(String(e&&e.message||e)));page.on('console',m=>{if(m.type()==='error'&&!/404|Failed to load resource|ERR_/.test(m.text()))errors.push('console: '+m.text())});
+  await page.evaluateOnNewDocument((s,uid,lang,cfg,sess,offline)=>{
+    Object.defineProperty(Navigator.prototype,'onLine',{configurable:true,get:()=>localStorage.getItem('__offline')!=='1'});
+    if(localStorage.getItem('__seeded'))return;localStorage.setItem('__seeded','1');localStorage.setItem('mock_db',s);localStorage.setItem('mock_cfg',JSON.stringify(cfg));
+    if(lang!=='en')localStorage.setItem('ht_lang',lang);if(offline)localStorage.setItem('__offline','1');
+    if(uid){localStorage.setItem('ht-auth',sess);localStorage.setItem('ht_last_uid',uid)}
+  },JSON.stringify(seed()),uid,lang,cfg,uid?session(uid):'',offline);
+  if(inset){const c=await page.createCDPSession();await c.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:47,bottom:inset}})}
+  
+  const api={page,ctx,dialogs,errors,
+    go:async(u=url)=>{await page.goto(BASE+u,{waitUntil:'domcontentloaded'})},
+    text:sel=>page.$eval(sel,e=>e.textContent.replace(/\u00a0/g,' ').trim()).catch(()=>null),
+    has:sel=>page.$(sel).then(x=>!!x),
+    wait:(fn,arg,timeout=6000)=>page.waitForFunction(fn,{timeout,polling:20},arg),
+    dash:(timeout=6000)=>page.waitForFunction(()=>{const b=document.querySelector('#bal');return b&&/[\d٠-٩]/.test(b.textContent)},{timeout,polling:10}),
+    status:(re,timeout=6000)=>page.waitForFunction(s=>{const e=document.querySelector('#ns');return e&&new RegExp(s).test(e.textContent)},{timeout,polling:20},re.source),
+    cfg:c=>page.evaluate(c=>{Object.assign(window.__cfg,c);localStorage.setItem('mock_cfg',JSON.stringify(window.__cfg))},c),
+    db:()=>page.evaluate(()=>JSON.parse(localStorage.getItem('mock_db'))),
+    setDb:fn=>page.evaluate(src=>{const d=JSON.parse(localStorage.getItem('mock_db'));(0,eval)('('+src+')')(d);localStorage.setItem('mock_db',JSON.stringify(d))},fn.toString()),
+    net:on=>page.evaluate(on=>{on?localStorage.removeItem('__offline'):localStorage.setItem('__offline','1');dispatchEvent(new Event(on?'online':'offline'))},on),
+    toast:()=>page.evaluate(()=>{const t=document.querySelector('#toast');return t&&t.classList.contains('on')?t.textContent:''}),
+    queue:uid=>page.evaluate(u=>JSON.parse(localStorage.getItem('ht_q:'+u)||'[]'),uid),
+    shot:name=>page.screenshot({path:path.join(SHOTS,name+'.png')}),
+    close:()=>ctx.close()};
+  return api}
+const addExpense=async(p,amount,what,wallet)=>{await p.page.click('[data-t="expense"]');await p.wait(()=>document.querySelector('#sh').classList.contains('on'));
+  await p.page.$eval('#amt',(e,v)=>e.value=v,String(amount));await p.page.$eval('#nt',(e,v)=>e.value=v,what);if(wallet)await p.page.select('#wl',wallet);await p.page.click('#sv')};
+const noErr=p=>eq(p.errors,[],'page errors:');
+
+try{
+console.log('\nStartup');
+await test('first-ever launch / logged out: login form appears immediately, without a network round trip',async()=>{
+  const p=await open({cfg:{latency:3000}});const t=Date.now();await p.go();await p.wait(()=>!!document.querySelector('#em'),null,1500);
+  ok(Date.now()-t<1500);ok(!(await p.has('#bal')));eq((await p.page.evaluate(()=>window.__calls.filter(c=>!c.name.startsWith('auth.')).length)),0,'no data request for a logged-out visitor:');noErr(p);await p.close()});
+let warm;
+await test('fresh login: shell + skeleton while the household loads, then the dashboard with server data',async()=>{
+  warm=await open({cfg:{latency:700}});const p=warm;await p.go();await p.wait(()=>!!document.querySelector('#em'));
+  await p.page.type('#em','owner@t.io');await p.page.type('#pw','secret1');await p.page.click('#go');
+  await p.wait(()=>!!document.querySelector('#bootsk')&&!document.querySelector('#bootsk').hidden&&!document.querySelector('#em'),null,3000);   // not the old blank "Loading…"
+  await p.dash();await p.status(/Online/);eq(await p.text('#bal'),'EGP 730.00');
+  ok(JSON.parse(await p.page.evaluate(()=>localStorage.getItem('ht_c'))).uid===O,'cache is stamped with its owner');noErr(p)});
+await test('wrong password shows the error and stays on the login form',async()=>{
+  const p=await open();await p.go();await p.wait(()=>!!document.querySelector('#em'));await p.page.type('#em','owner@t.io');await p.page.type('#pw','nope');await p.page.click('#go');
+  await p.wait(()=>/Invalid login/.test(document.querySelector('#er').textContent));ok(!(await p.page.$eval('#go',e=>e.disabled)));await p.close()});
+await test('fast cached startup on a SLOW network: cached dashboard at once, "Updating…" indicator, then fresh data replaces it',async()=>{
+  const p=warm;await p.cfg({latency:2500,authDelay:2500});
+  await p.setDb(d=>{const t=d.transactions.find(x=>x.category==='Vegetables');t.amount=160});      // the server changed while the app was closed
+  const t=Date.now();await p.page.reload({waitUntil:'domcontentloaded'});await p.dash(1500);const ms=Date.now()-t;
+  eq(await p.text('#bal'),'EGP 730.00','cached value first:');ok(ms<1000,`dashboard took ${ms} ms`);
+  eq(await p.text('#ns'),'Updating…');ok(!(await p.page.evaluate(()=>document.body.innerText.includes('Loading…'))),'no full-screen Loading…');
+  ok(await p.has('#nv')&&await p.has('.qc')&&await p.has('.tx'),'cached wallets / quick purchases / recent are on screen');
+  console.log(`       (cached dashboard painted ${ms} ms after navigation start; backend latency 2500 ms + session check 2500 ms)`);
+  await p.wait(()=>document.querySelector('#bal').textContent.replace(/\u00a0/g,' ').trim()==='EGP 630.00',null,9000);await p.status(/Online/);noErr(p);await p.close()});
+await test('offline startup with an EXPIRED access token: cached dashboard (not the login screen); entry is queued, then synced once on reconnect',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);
+  await p.cfg({auth:'netfail',down:true});await p.net(false);await p.page.reload({waitUntil:'domcontentloaded'});
+  await p.dash(1500);await p.status(/Offline/);ok(!(await p.has('#em')),'must not be thrown to the login screen');eq(await p.text('#bal'),'EGP 730.00');
+  await addExpense(p,15,'Tea');await p.status(/Offline · 1 waiting/);eq(await p.text('#bal'),'EGP 715.00');ok((await p.text('#tl')).includes('waiting to sync'));
+  await p.cfg({auth:'ok',down:false});await p.net(true);await p.status(/Online/);
+  const d=await p.db();eq(d.transactions.filter(x=>x.category==='Tea').length,1);eq((await p.queue(M)).length,0);
+  await p.net(false);await p.net(true);await sleep(300);eq((await p.db()).transactions.filter(x=>x.category==='Tea').length,1,'no duplicate after another reconnect:');noErr(p);await p.close()});
+await test('expired session (refresh token rejected): login screen with a clear message; the unsynced queue is kept',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);
+  await p.net(false);await addExpense(p,5,'Gum');await p.status(/1 waiting/);
+  await p.cfg({auth:'rejected'});await p.page.evaluate(()=>localStorage.removeItem('__offline'));await p.page.reload({waitUntil:'domcontentloaded'});
+  await p.wait(()=>!!document.querySelector('#em'));ok(/session expired/i.test(await p.text('#er')),'msg: '+await p.text('#er'));ok(!(await p.has('#bal')),'dash gone');
+  eq((await p.queue(M)).length,1);eq((await p.db()).transactions.filter(x=>x.category==='Gum').length,0);
+  await p.cfg({auth:'ok'});await p.page.type('#em','mona@t.io');await p.page.type('#pw','secret1');await p.page.click('#go');   // logging back in syncs it
+  await p.dash();await p.wait(()=>JSON.parse(localStorage.getItem('mock_db')).transactions.some(x=>x.category==='Gum'));eq((await p.queue(M)).length,0);noErr(p);await p.close()});
+await test('Supabase unavailable (device online): cached dashboard + visible "couldn\'t refresh" notice with the real error, retry works',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
+  await p.cfg({down:true,auth:'netfail'});await p.page.reload({waitUntil:'domcontentloaded'});await p.dash(1500);
+  await p.wait(()=>{const b=document.querySelector('#syb');return b&&!b.hidden&&/Couldn't refresh/.test(b.textContent)&&/Failed to fetch/.test(b.textContent)});eq(await p.text('#ns'),'Saved data');
+  await p.cfg({down:false,auth:'ok'});await p.page.click('#syb [data-act="reload"]');await p.status(/Online/);ok(await p.page.$eval('#syb',e=>e.hidden));noErr(p);await p.close()});
+await test('Supabase unavailable with a session but NO cache: "Can\'t reach the server" + Try again (no fake dashboard)',async()=>{
+  const p=await open({uid:O,cfg:{down:true}});await p.go();await p.wait(()=>/Can't reach the server/.test(document.body.innerText));ok(!(await p.has('#bal')));
+  await p.cfg({down:false});await p.page.click('#rt');await p.dash();noErr(p);await p.close()});
+await test('session check hangs forever: the cached dashboard stays usable',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);await p.cfg({auth:'hang',hang:true});
+  await p.page.reload({waitUntil:'domcontentloaded'});await p.dash(1500);await p.page.click('[data-t="expense"]');await p.wait(()=>document.querySelector('#sh').classList.contains('on'));noErr(p);await p.close()});
+await test('account switch on one device: the next user never sees the previous user\'s cached data or queue',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);await p.net(false);await addExpense(p,7,'Private');await p.status(/1 waiting/);
+  await p.page.click('#gear');await p.page.click('#lo');await p.wait(()=>!!document.querySelector('#em'));          // offline logout must really log out
+  eq(await p.page.evaluate(()=>localStorage.getItem('ht-auth')),null);eq(await p.page.evaluate(()=>localStorage.getItem('ht_c')),null);
+  await p.setDb(d=>{d.users.push({id:'u-new',email:'new@t.io',password:'secret1',name:'New'})});await p.net(true);
+  await p.page.type('#em','new@t.io');await p.page.type('#pw','secret1');await p.page.click('#go');
+  await p.wait(()=>/Your household/.test(document.body.innerText));ok(!(await p.page.evaluate(()=>document.body.innerText.includes('Private'))));
+  eq((await p.queue(M)).length,1,"Mona's entry is still waiting for Mona:");eq((await p.db()).transactions.filter(x=>x.category==='Private').length,0);noErr(p);await p.close()});
+
+console.log('\nDelete + error attribution');
+await test('owner deletes a DELETED USER\'s transfer that the wallet cannot cover: succeeds, no "insufficient funds"',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);await p.page.click('#va');await p.wait(()=>document.querySelectorAll('#hl .tx').length>=6);
+  await p.page.click(`#hl [data-d="${T_TRANSFER}"]`);await p.wait(id=>!JSON.parse(localStorage.getItem('mock_db')).transactions.some(t=>t.id===id),T_TRANSFER);
+  ok(/Delete this transaction\?/.test(p.dialogs[0])&&/negative balance/.test(p.dialogs[0])&&/Personal cash/.test(p.dialogs[0]),'confirm explains the consequence: '+p.dialogs[0]);
+  await p.status(/Online/);eq(await p.toast(),'');eq((await p.queue(O)).length,0);
+  await p.page.click('[data-n="home"]');await p.wait(()=>[...document.querySelectorAll('#wb .wc')].some(c=>/Personal cash/.test(c.textContent)&&/-|−/.test(c.textContent)&&c.querySelector('b.neg')));noErr(p);await p.close()});
+await test('non-owner: deleted-user rows are labelled "Deleted user" and offer no edit/delete; own rows do',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);await p.page.click('#va');await p.wait(()=>document.querySelectorAll('#hl .tx').length>=6);
+  const r=await p.page.evaluate(()=>[...document.querySelectorAll('#hl .tx')].map(e=>({t:e.textContent,d:!!e.querySelector('[data-d]'),e:!!e.querySelector('[data-e]')})));
+  const del=r.filter(x=>x.t.includes('Deleted user'));eq(del.length,2);ok(del.every(x=>!x.d&&!x.e));
+  ok(r.find(x=>x.t.includes('Bread')).d,'own entry is deletable');ok(!r.find(x=>x.t.includes('Vegetables')).d,"owner's entry is not");
+  await p.page.select('#fm','~deleted');await p.wait(()=>document.querySelectorAll('#hl .tx').length===2);noErr(p);await p.close()});
+await test('server refuses a delete (stale role): reported as "Delete sync failed … not allowed", never as a funds error',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);
+  await p.page.evaluate(()=>{role='owner';paint()});                                             // device believes it may delete; the server decides
+  await p.page.click(`#tl [data-d="${T_VEG}"]`);await p.wait(()=>document.querySelector('#toast')&&document.querySelector('#toast').classList.contains('on'));
+  const t=await p.toast();ok(/^Delete sync failed \(Vegetables · EGP\s60\.00\): You are not allowed to delete this entry\./.test(t),t);ok((await p.db()).transactions.some(x=>x.id===T_VEG));
+  await p.wait(id=>!!document.querySelector(`#tl .tx [data-e="${id}"]`)||[...document.querySelectorAll('#tl .tx')].some(e=>e.textContent.includes('Vegetables')),T_VEG);noErr(p);await p.close()});
+await test('delete while offline -> queued; delete after reconnect -> applied once',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);await p.net(false);
+  await p.page.click(`#tl [data-d="${T_BREAD}"]`);await p.status(/Offline · 1 waiting/);eq(await p.text('#bal'),'EGP 750.00');ok((await p.db()).transactions.some(x=>x.id===T_BREAD));
+  await p.net(true);await p.status(/Online/);ok(!(await p.db()).transactions.some(x=>x.id===T_BREAD));eq(await p.toast(),'');eq(await p.text('#bal'),'EGP 750.00');noErr(p);await p.close()});
+await test('delete queued together with an expense that fails: the error is attributed to the EXPENSE, the delete succeeds',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);await p.net(false);
+  await addExpense(p,50,'Shoes',WP);                                                              // Personal cash has 10: offline "save anyway"
+  ok(p.dialogs.some(d=>/Insufficient funds/.test(d)),'offline warning shown');await p.status(/1 waiting/);
+  await p.page.click(`#tl [data-d="${T_BREAD}"]`);await p.status(/2 waiting/);
+  await p.net(true);await p.wait(()=>document.querySelector('#toast')&&document.querySelector('#toast').classList.contains('on'));
+  const t=await p.toast();ok(/^Expense sync failed \(Shoes · EGP\s50\.00\): Insufficient funds\. Available balance in Personal cash: 10\.00 EGP\./.test(t),'toast: '+t);
+  ok(!/Delete/.test(t)&&!/Could not save/.test(t));ok(await p.page.$eval('#toast',e=>e.classList.contains('bad')));
+  const d=await p.db();ok(!d.transactions.some(x=>x.id===T_BREAD),'delete was applied');ok(!d.transactions.some(x=>x.category==='Shoes'));
+  const q=await p.queue(M);eq(q.map(o=>[o.state,o.category]),[['failed','Shoes']]);
+  await p.page.click('#syb [data-act="sync"]');await p.wait(()=>/Needs attention/.test(document.querySelector('#more').textContent));
+  const s=await p.text('#more');ok(/Expense · Shoes/.test(s)&&/Expense sync failed: Insufficient funds/.test(s),s);noErr(p);await p.close()});
+await test('"Add to Quick Purchases only" never creates a transaction',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);const n0=(await p.db()).transactions.length;
+  await p.page.click('[data-t="expense"]');await p.wait(()=>document.querySelector('#sh').classList.contains('on'));await p.page.$eval('#nt',e=>e.value='Tuna');
+  await p.page.click('#qa');await p.page.$eval('#qp',e=>e.value='35');await p.page.click('#qo');
+  await p.wait(()=>JSON.parse(localStorage.getItem('mock_db')).quick_items.some(q=>q.name==='Tuna'&&q.default_price===35));await p.status(/Online/);
+  eq((await p.db()).transactions.length,n0);ok((await p.text('#qi')).includes('Tuna'));noErr(p);await p.close()});
+
+console.log('\nDeleted-user consistency + views');
+await test('Home, History, Daily and Stats all keep deleted-user entries and call them "Deleted user"',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
+  await p.page.click('#va');await p.wait(()=>(document.querySelector('#hl')||{textContent:''}).textContent.split('Deleted user').length===3);
+  await p.page.click('[data-n="daily"]');await p.wait(()=>/By person/.test(document.querySelector('#more').textContent)&&/Deleted user/.test(document.querySelector('#more').textContent));
+  const d0=await p.page.$eval('#dp',e=>e.value);await p.page.click('#dpv');await p.wait(v=>document.querySelector('#dp')&&document.querySelector('#dp').value<v,d0);   // "previous day" really works
+  await p.page.click('[data-n="stats"]');await p.wait(()=>/Biggest purchases/.test(document.querySelector('#more').textContent)&&/Deleted user/.test(document.querySelector('#more').textContent));noErr(p);await p.close()});
+await test('delete account: back to login, token + cache + queue removed from the device; household history keeps the entries',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);await p.page.click('#gear');await p.page.click('#ac');
+  await p.page.type('#dc','DELETE');await p.page.click('#dd');await p.wait(()=>!!document.querySelector('#em'));ok(/account was deleted/i.test(await p.text('#er')));
+  eq(await p.page.evaluate(()=>[localStorage.getItem('ht-auth'),localStorage.getItem('ht_c'),localStorage.getItem('ht_hh')]),[null,null,null]);
+  const d=await p.db();ok(!d.users.some(u=>u.id===M));eq(d.transactions.find(t=>t.id===T_BREAD).user_id,null);eq(d.members.length,1);noErr(p);await p.close();
+  const o=await open({uid:O});await o.setDb&&0;await o.go();await o.page.evaluate(id=>{const d=JSON.parse(localStorage.getItem('mock_db'));d.users=d.users.filter(u=>u.id!==id);d.members=d.members.filter(m=>m.user_id!==id);d.transactions.forEach(t=>{if(t.user_id===id)t.user_id=null});localStorage.setItem('mock_db',JSON.stringify(d))},M);
+  await o.page.reload({waitUntil:'domcontentloaded'});await o.dash();await o.wait(()=>[...document.querySelectorAll('#tl .tx')].some(e=>/Bread/.test(e.textContent)&&/Deleted user/.test(e.textContent)&&e.querySelector('[data-d]')));await o.close()});
+await test('owner who still has members is told why the account cannot be deleted (stays logged in)',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);await p.page.click('#gear');await p.page.click('#ac');await p.page.type('#dc','DELETE');await p.page.click('#dd');
+  await p.wait(()=>/still has other members/.test(document.querySelector('#de').textContent));ok(await p.page.evaluate(()=>!!localStorage.getItem('ht-auth')));await p.close()});
+
+console.log('\nLayout: bottom navigation, spacing, safe areas, RTL');
+const metrics=p=>p.page.evaluate(()=>{const r=s=>{const e=document.querySelector(s);return e?e.getBoundingClientRect():null},nv=r('#nv'),btn=[...document.querySelectorAll('#nv button')].map(b=>b.getBoundingClientRect());
+  const secs=[...document.querySelectorAll('#home .sec')].map(e=>Math.round(e.getBoundingClientRect().top+scrollY));
+  const mins=sel=>Math.min(...[...document.querySelectorAll(sel)].map(e=>e.getBoundingClientRect().height));
+  return{W:innerWidth,H:innerHeight,navTop:nv.top,navBottom:nv.bottom,navLeft:nv.left,navRight:nv.right,btnBottom:Math.max(...btn.map(b=>b.bottom)),btnH:Math.min(...btn.map(b=>b.height)),firstBtnX:btn[0].left,
+    overflowX:document.documentElement.scrollWidth-innerWidth,quickTop:secs[0],recentTop:secs[1],pageH:document.documentElement.scrollHeight,
+    hero:Math.round(r('.hero').height),wallets:Math.round(r('.wgrid').height),cta:r('.cta').height,chips:mins('.chips2 button'),quick:mins('.qc'),gear:r('#gear').height,walletText:[...document.querySelectorAll('.wc b')].every(b=>b.scrollWidth<=b.clientWidth+1)}});
+const lastRowClear=p=>p.page.evaluate(()=>{scrollTo(0,document.documentElement.scrollHeight);const l=[...document.querySelectorAll('#tl .tx')].pop().getBoundingClientRect(),b=[...document.querySelectorAll('#nv button')][0].getBoundingClientRect();const ok=l.bottom<=b.top+0.5;scrollTo(0,0);return ok});
+let before=null;
+if(OLD)await test('(baseline) measure the previous version on an iPhone-sized screen',async()=>{
+  const p=await open({uid:O,inset:34,url:'old.html'});await p.go();await p.dash();await sleep(600);before=await metrics(p);await p.shot('before-iphone');await p.close()});
+await test('iPhone (home indicator, 34px inset): bar is flush with the bottom, buttons stay above the indicator, tighter Home',async()=>{
+  const p=await open({uid:O,inset:34});await p.go();await p.dash();await p.status(/Online/);const m=await metrics(p);await p.shot('iphone-home');
+  eq([m.navLeft,m.W-m.navRight,Math.round(m.H-m.navBottom)],[0,0,0],'nav edges (left,right,bottom gap):');
+  ok(m.btnBottom<=m.H-34+0.5,`buttons must end above the home indicator (${m.btnBottom} vs ${m.H-34})`);ok(m.btnH>=48);ok(m.overflowX<=0,'no horizontal scroll');
+  ok(m.cta>=48&&m.chips>=44&&m.quick>=44&&m.gear>=44,'touch targets '+JSON.stringify([m.cta,m.chips,m.quick,m.gear]));ok(m.walletText,'wallet amounts fit');ok(await lastRowClear(p),'last row is not hidden behind the bar');
+  if(before){console.log(`       before -> after (390x844): "Quick purchases" starts at ${before.quickTop}px -> ${m.quickTop}px, "Recent" at ${before.recentTop}px -> ${m.recentTop}px, page height ${before.pageH}px -> ${m.pageH}px, nav gap below bar ${Math.round(before.H-before.navBottom)}px -> ${Math.round(m.H-m.navBottom)}px`);
+    ok(m.quickTop<=before.quickTop-80,'Home is meaningfully tighter');ok(m.recentTop<before.recentTop-120)}
+  ok(m.quickTop<m.H-90,'Quick purchases start on the first screen');noErr(p);await p.close()});
+await test('Android-sized phone (no inset): bar sits exactly on the bottom edge, no gap',async()=>{
+  const p=await open({uid:O,vp:'android'});await p.go();await p.dash();await p.status(/Online/);const m=await metrics(p);await p.shot('android-home');
+  eq([m.navLeft,m.W-m.navRight,Math.round(m.H-m.navBottom)],[0,0,0]);ok(m.H-m.btnBottom<=1,'no dead space under the buttons: '+(m.H-m.btnBottom));ok(m.overflowX<=0);ok(m.walletText);ok(await lastRowClear(p));noErr(p);await p.close()});
+await test('installed-PWA conditions (full-screen viewport with notch + home-indicator insets): header, bar and sheet respect the safe areas',async()=>{
+  const p=await open({uid:O,inset:34,standalone:true});await p.go();await p.dash();await p.status(/Online/);const m=await metrics(p);
+  eq(Math.round(m.H-m.navBottom),0);ok(m.btnBottom<=m.H-34+0.5);ok(await p.page.evaluate(()=>document.querySelector('.top').getBoundingClientRect().top>=47),'header clears the status bar / notch');
+  await p.page.click('[data-t="expense"]');await p.wait(()=>document.querySelector('#sh').classList.contains('on'));await sleep(350);
+  ok(await p.page.evaluate(()=>{const b=[...document.querySelectorAll('#sh .btn')].filter(x=>!x.hidden).pop().getBoundingClientRect();return b.bottom<=innerHeight-34+0.5}),'sheet buttons clear the home indicator');await p.shot('iphone-sheet');noErr(p);await p.close()});
+await test('iPad: bar spans the bottom edge, content uses the width, nothing overflows',async()=>{
+  const p=await open({uid:O,vp:'ipad'});await p.go();await p.dash();await p.status(/Online/);const m=await metrics(p);await p.shot('ipad-home');
+  eq([m.navLeft,m.W-m.navRight,Math.round(m.H-m.navBottom)],[0,0,0]);ok(m.overflowX<=0);ok(await p.page.evaluate(()=>getComputedStyle(document.querySelector('.wgrid')).gridTemplateColumns.split(' ').length===4));noErr(p);await p.close()});
+await test('Arabic / RTL: mirrored navigation and rows, arrow points source → destination in reading order, no overflow',async()=>{
+  const p=await open({uid:O,lang:'ar',inset:34});await p.go();await p.dash();await sleep(500);const m=await metrics(p);await p.shot('iphone-rtl');
+  eq(await p.page.evaluate(()=>[document.documentElement.dir,document.documentElement.lang]),['rtl','ar']);
+  ok(m.firstBtnX>m.W/2,'Home tab is on the right in RTL');eq(Math.round(m.H-m.navBottom),0);ok(m.overflowX<=0);ok(m.walletText);
+  const r=await p.page.evaluate(()=>{const t=[...document.querySelectorAll('#tl .tx')].find(e=>e.querySelector('.wl').textContent.includes('←'));const ic=document.querySelector('#tl .tx .ti').getBoundingClientRect(),am=document.querySelector('#tl .tx .ta').getBoundingClientRect();
+    return{arrow:!!t,iconRight:ic.left>am.left,nav:document.querySelector('#nv button span').textContent,st:document.querySelector('#ns').textContent,del:document.body.innerText.includes('مستخدم محذوف'),digits:/[٠-٩]/.test(document.querySelector('#bal').textContent)}});
+  ok(r.arrow,'transfer shows source ← destination');ok(r.iconRight,'row is mirrored');eq(r.nav,'الرئيسية');ok(r.del,'"Deleted user" is translated');ok(r.digits,'Arabic-Indic digits / currency');
+  await p.page.click('#gear');const g=await p.page.evaluate(()=>{const a=document.querySelector('#menu').getBoundingClientRect();return a.left>=0&&a.left<innerWidth/2});ok(g,'settings menu opens on the leading (left) side in RTL');noErr(p);await p.close()});
+
+console.log('\nPWA / service worker');
+await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
+  srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
+  await p.page.evaluate(()=>navigator.serviceWorker.ready);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v6'))return false;const c=await caches.open('ht-v6');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
+  srv.dead=true;await p.cfg({down:true,auth:'netfail'});await p.net(false);
+  await p.page.reload({waitUntil:'domcontentloaded'});await p.dash(3000);await p.status(/Offline/);eq(await p.text('#bal'),'EGP 730.00');noErr(p);
+  srv.dead=false;srv.noSW=true;await p.close()});
+}catch(e){console.error(e);process.exitCode=1}
+finally{done('ui');await browser.close();server.close()}
