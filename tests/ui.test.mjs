@@ -41,7 +41,7 @@ const seed=()=>{n=0;return{users:[{id:O,email:'owner@t.io',password:'secret1',na
     tx(M,'expense',20,WC,null,'Bread',200),tx(O,'expense',60,WC,null,'Vegetables',100)]}};      // Mona's -> ...005, Omar's -> ...006
 const T_TRANSFER='00000000-0000-4000-8000-000000000003',T_BREAD='00000000-0000-4000-8000-000000000005',T_VEG='00000000-0000-4000-8000-000000000006';
 const session=uid=>JSON.stringify({access_token:'tok',refresh_token:'r',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:uid}});
-const VP={iphone:{width:390,height:844,deviceScaleFactor:2,isMobile:true,hasTouch:true},android:{width:360,height:800,deviceScaleFactor:2,isMobile:true,hasTouch:true},ipad:{width:820,height:1180,deviceScaleFactor:1,isMobile:true,hasTouch:true}};
+const VP={iphone:{width:390,height:844,deviceScaleFactor:2,isMobile:true,hasTouch:true},android:{width:360,height:800,deviceScaleFactor:2,isMobile:true,hasTouch:true},ipadl:{width:1180,height:820,deviceScaleFactor:1,isMobile:true,hasTouch:true},ipad:{width:820,height:1180,deviceScaleFactor:1,isMobile:true,hasTouch:true}};
 
 async function open({uid=null,lang='en',vp='iphone',cfg={},url='',inset=0,standalone=false,offline=false}={}){
   const ctx=await browser.createBrowserContext(),page=await ctx.newPage();await page.setViewport(VP[vp]);
@@ -304,6 +304,29 @@ await test('Arabic / RTL: mirrored navigation and rows, arrow points source → 
   ok(r.arrow,'transfer shows source ← destination');ok(r.iconRight,'row is mirrored');eq(r.nav,'الرئيسية');ok(r.del,'"Deleted user" is translated');ok(r.digits,'Arabic-Indic digits / currency');
   await p.page.click('#gear');const g=await p.page.evaluate(()=>{const a=document.querySelector('#menu').getBoundingClientRect();return a.left>=0&&a.left<innerWidth/2});ok(g,'settings menu opens on the leading (left) side in RTL');noErr(p);await p.close()});
 
+console.log('\nSheets + wide layout');
+await test('sheet: close button on top (always visible), page behind is locked, the sheet scrolls inside the visible screen, position restored on close',async()=>{
+  const p=await open({uid:O,inset:34});await p.go();await p.dash();await p.status(/Online/);await p.page.evaluate(()=>window.scrollTo(0,300));const y0=await p.page.evaluate(()=>scrollY);ok(y0>100);
+  await p.page.$eval('[data-t="expense"]',e=>e.click());await p.wait(()=>document.querySelector('#sh').classList.contains('on'));await p.page.click('#qa');await sleep(350);
+  const m=await p.page.evaluate(()=>{const d=document.querySelector('#sh>div'),x=document.querySelector('#sh [data-x]').getBoundingClientRect(),b=d.getBoundingClientRect();d.scrollTop=9999;
+    const x2=document.querySelector('#sh [data-x]').getBoundingClientRect(),last=[...d.querySelectorAll('.btn')].filter(e=>!e.hidden).pop().getBoundingClientRect(),em=[...document.querySelectorAll('#qic button')].map(e=>e.getBoundingClientRect());
+    return{locked:getComputedStyle(document.body).position,scrolls:d.scrollHeight>d.clientHeight,st:d.scrollTop,top:b.top,bottom:b.bottom,H:innerHeight,x:[x.top,x.width,x.height],xAfter:x2.top,lastBottom:last.bottom,
+      emoRow:new Set(em.map(r=>Math.round(r.top))).size,emoH:new Set(em.map(r=>Math.round(r.height))).size,ox:d.scrollWidth-d.clientWidth}});
+  eq(m.locked,'fixed','page behind is locked:');ok(m.top>=47&&m.bottom<=m.H+.5,'sheet inside the screen '+JSON.stringify(m));ok(m.scrolls&&m.st>0,'sheet content scrolls');
+  ok(m.x[0]>=m.top&&m.x[1]>=40&&m.x[2]>=40&&Math.abs(m.xAfter-m.x[0])<1,'close button stays at the top while scrolling');ok(m.lastBottom<=m.H-34+.5,'last button reachable above the home indicator');
+  eq([m.emoRow,m.emoH,m.ox],[1,1,0],'icon row: one aligned row, equal heights, no sideways overflow:');
+  await p.page.evaluate(()=>window.scrollTo(0,0));eq(await p.page.evaluate(()=>document.body.style.top),'-'+y0+'px','background did not move:');
+  await p.page.click('#sh [data-x]');await p.wait(()=>!document.querySelector('#sh').classList.contains('on'));eq(await p.page.evaluate(()=>[getComputedStyle(document.body).position,scrollY]),['static',y0]);
+  await p.page.$eval('#qadd',e=>e.click());await p.wait(()=>document.querySelector('#qs').classList.contains('on'));ok(await p.has('#qs [data-x]'));await p.page.click('#qs [data-x]');await p.wait(()=>!document.querySelector('#qs').classList.contains('on'));
+  noErr(p);await p.close()});
+await test('iPad landscape (two columns): nothing overlaps the Recent column; Arabic names keep the page alignment',async()=>{
+  const p=await open({uid:O,vp:'ipadl'});await p.go();await p.dash();await p.status(/Online/);
+  await p.setDb(d=>{d.transactions[d.transactions.length-1].category='صلصه'});await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.status(/Online/);await p.wait(()=>[...document.querySelectorAll('#tl .tm b')].some(b=>b.textContent==='صلصه'));
+  const m=await p.page.evaluate(()=>{const r=e=>e.getBoundingClientRect(),left=r(document.querySelector('.cols>div')),tiles=[...document.querySelectorAll('.wgrid .wc')].map(r),rec=r(document.querySelector('#tl')),bg=r(document.querySelector('.hdbg')),h=r(document.querySelector('.cols>div+div h2'));
+    const ar=[...document.querySelectorAll('#tl .tm b')].find(b=>b.textContent==='صلصه'),en=[...document.querySelectorAll('#tl .tm b')].find(b=>b.textContent!=='صلصه');
+    return{over:tiles.filter(t=>t.right>left.right+.5).length,gap:rec.left-Math.max(...tiles.map(t=>t.right)),band:bg.bottom<=h.top,align:[getComputedStyle(ar).textAlign,getComputedStyle(en).textAlign],ox:document.documentElement.scrollWidth-innerWidth}});
+  eq(m.over,0,'wallet tiles inside their column:');ok(m.gap>=16,'gap to Recent '+m.gap);ok(m.band,'header band ends above the Recent heading');eq(m.align,['left','left']);ok(m.ox<=0);await p.shot('ipad-landscape');noErr(p);await p.close()});
+
 console.log('\nPush notifications (OneSignal)');
 /* cdn.onesignal.com is answered with a small stand-in that records how the app drives the SDK (the real SDK needs the real site address) */
 const STUB=`(()=>{const L=window.__os={init:[],calls:[],perm:false,opted:false,native:'default'};const ev={addEventListener(){}};
@@ -338,10 +361,10 @@ console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v8'))return false;const c=await caches.open('ht-v8');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v9'))return false;const c=await caches.open('ht-v9');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
-  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v8');await new Promise(r=>setTimeout(r,200));
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v9');await new Promise(r=>setTimeout(r,200));
     return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
       cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
   eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');
