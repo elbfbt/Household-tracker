@@ -135,6 +135,24 @@ body{overflow-x:hidden;overflow-x:clip}
 @media(min-width:900px){main{max-width:1120px;padding-bottom:40px}.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;align-items:start}.cols>div+div{position:sticky;top:76px;max-height:calc(100vh - 100px);overflow:auto}
 #nv{position:sticky;top:8px;bottom:auto;left:auto;right:auto;max-width:none;margin:6px 0 10px;padding:6px;border:0;border-radius:22px;box-shadow:0 10px 36px rgba(13,50,40,.16)}#nv button{max-width:none}#nv button.on::after{top:auto;bottom:2px;border-radius:3px}#toast{bottom:24px}.hdbg{top:-90px;height:330px}#more{max-width:900px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* user text uses dir="auto" so Arabic reads correctly, but it keeps the alignment of the page (no jumping to the other side) */
+[dir=auto]{text-align:left}[dir=rtl] [dir=auto]{text-align:right}#amt,[dir=rtl] #amt{text-align:center}
+.wgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.qgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:600px){.wgrid{grid-template-columns:repeat(4,minmax(0,1fr))}.qgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* wide two-column layout (iPad landscape, desktop): wallets go 2x2 inside the left column; the header band stops above the columns */
+@media(min-width:900px){.wgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.hdbg,[dir=rtl] .hdbg{top:-90px;height:152px;border-radius:0}.hdbg::after{display:none}.cols>div+div .sec{margin-top:6px}}
+/* ---- sheets: sized to the VISIBLE screen (keyboard included), scroll inside, page behind is locked, close button on top ---- */
+.sheet{top:var(--vt,0px);bottom:auto;height:var(--vh,100%);overscroll-behavior:contain}
+.sheet>div{max-height:calc(var(--vh,100dvh) - 10px - env(safe-area-inset-top));padding-top:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
+.shh{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);padding:14px 0 8px;min-height:60px}
+.shh>b{font-size:20px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shx{flex:none;width:40px;height:40px;border-radius:50%;background:var(--card);box-shadow:var(--sh);color:var(--tx);display:grid;place-items:center;position:relative}.shx::after{content:"";position:absolute;inset:-6px}.shx svg{width:20px;height:20px}
+#amt{font-size:30px;min-height:58px;padding:8px 16px}.sheet .lb{margin-top:8px}.sheet input,.sheet select{margin:5px 0}
+.qrow{padding:10px 4px 4px}.qrow input{flex:none}
+.emo{gap:8px;padding:6px 2px 10px;margin:0 -2px;touch-action:pan-x;overscroll-behavior:contain;scrollbar-width:none;align-items:center}.emo::-webkit-scrollbar{display:none}
+.emo button{width:46px;min-width:46px;height:46px;padding:0;display:grid;place-items:center;line-height:1;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+.emo button.auto{width:auto;padding:0 12px;font-family:inherit;display:inline-flex;gap:6px;white-space:nowrap}.emo button.auto i{font-style:normal;font-size:20px;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+html.lock{overflow:hidden;overscroll-behavior:none}body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 /* OneSignal subscription bell: above the bottom tab bar + home indicator, never on top of an open sheet */
 #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher{bottom:calc(76px + env(safe-area-inset-bottom))!important}
 body:has(.sheet.on) #onesignal-bell-container{display:none!important}
@@ -143,8 +161,8 @@ body:has(.sheet.on) #onesignal-bell-container{display:none!important}
 <script>/* returning user: show the dashboard-shaped shell immediately (the real cached numbers replace it as soon as the app script runs) */
 try{if(localStorage.getItem('ht_lang')==='ar'){document.documentElement.lang='ar';document.documentElement.dir='rtl';document.getElementById('bootmsg').textContent='جارٍ التحميل…'}
 if(localStorage.getItem('ht-auth')&&localStorage.getItem('ht_hh'))document.getElementById('bootsk').hidden=false}catch(e){}</script>
-<div class="sheet" id="sh" role="dialog" aria-modal="true" aria-labelledby="st"><div><b id="st"></b><small class="lb">Amount</small><input id="amt" inputmode="decimal" placeholder="0" aria-label="Amount"><input id="cat" placeholder="Category" hidden><small class="lb">Wallet</small><select id="wl" aria-label="Wallet"></select><select id="wl2" aria-label="To wallet"></select><small class="lb" id="ntl">Description</small><input id="nt" placeholder="Note (optional)"><label class="qrow" id="qrow" hidden><input type="checkbox" id="qa"><span>Add to Quick Purchases</span></label><small class="lb" id="qpl" hidden>Quick Purchase default price</small><input id="qp" inputmode="decimal" placeholder="Default price" hidden><small class="lb" id="qil" hidden>Icon</small><div class="emo" id="qic" hidden data-nt></div><button class="btn" id="sv">Save</button><button class="btn alt" id="qo" hidden>Add to Quick Purchases Only</button><button class="btn alt" onclick="sh.classList.remove('on')">Cancel</button></div></div>
-<div class="sheet" id="qs" role="dialog" aria-modal="true" aria-labelledby="qst"><div><b id="qst" style="font-size:20px;font-weight:700">Add Quick Purchase</b><div id="qsl"></div><button class="btn alt" id="qsc">Custom item…</button><button class="btn" id="qsd">Done</button></div></div>
+<div class="sheet" id="sh" role="dialog" aria-modal="true" aria-labelledby="st"><div><div class="shh"><b id="st"></b><button type="button" class="shx" data-x aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><small class="lb">Amount</small><input id="amt" inputmode="decimal" placeholder="0" aria-label="Amount"><input id="cat" placeholder="Category" hidden><small class="lb">Wallet</small><select id="wl" aria-label="Wallet"></select><select id="wl2" aria-label="To wallet"></select><small class="lb" id="ntl">Description</small><input id="nt" placeholder="Note (optional)"><label class="qrow" id="qrow" hidden><input type="checkbox" id="qa"><span>Add to Quick Purchases</span></label><small class="lb" id="qpl" hidden>Quick Purchase default price</small><input id="qp" inputmode="decimal" placeholder="Default price" hidden><small class="lb" id="qil" hidden>Icon</small><div class="emo" id="qic" hidden data-nt></div><button class="btn" id="sv">Save</button><button class="btn alt" id="qo" hidden>Add to Quick Purchases Only</button><button class="btn alt" onclick="sh.classList.remove('on')">Cancel</button></div></div>
+<div class="sheet" id="qs" role="dialog" aria-modal="true" aria-labelledby="qst"><div><div class="shh"><b id="qst">Add Quick Purchase</b><button type="button" class="shx" data-x aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div id="qsl"></div><button class="btn alt" id="qsc">Custom item…</button><button class="btn" id="qsd">Done</button></div></div>
 <script src="config.js"></script>
 <script src="core.js"></script>
 <script type="text/plain" id="appjs">
@@ -342,6 +360,19 @@ function openTemplates(){const s=$('#qs');
   draw();s.classList.add('on');$('#qsd').onclick=()=>s.classList.remove('on');$('#qsc').onclick=()=>{s.classList.remove('on');openSheet('expense');$('#qa').checked=true;$('#qa').onchange()}}
 /* wallet names and amounts always stay on one line and fully visible: text that is too wide for its card is
    scaled down (never cut off). Runs after each paint and on resize. */
+/* ---- sheets (dialogs) ----
+   While one is open: the page behind cannot scroll (it used to move instead of the sheet on iPhone), and the sheet is
+   sized to the visible part of the screen so its content stays reachable above the keyboard. Close: X, backdrop, Cancel. */
+(function(){if(window._sheets)return;window._sheets=1;const all=[...document.querySelectorAll('.sheet')],root=document.documentElement,vv=window.visualViewport;let y=0,locked=false;
+  const fit=()=>{if(!locked||!vv)return;root.style.setProperty('--vh',vv.height+'px');root.style.setProperty('--vt',vv.offsetTop+'px')};
+  const sync=()=>{const open=all.some(s=>s.classList.contains('on'));if(open===locked)return;locked=open;
+    if(open){y=window.scrollY;document.body.style.top=-y+'px';root.classList.add('lock');document.body.classList.add('lock');fit();all.forEach(s=>{const d=s.firstElementChild;if(d)d.scrollTop=0})}
+    else{root.classList.remove('lock');document.body.classList.remove('lock');document.body.style.top='';root.style.removeProperty('--vh');root.style.removeProperty('--vt');window.scrollTo(0,y);if(document.activeElement&&document.activeElement.blur)document.activeElement.blur()}};
+  const mo=new MutationObserver(sync);all.forEach(s=>{mo.observe(s,{attributes:true,attributeFilter:['class']});
+    s.addEventListener('click',e=>{if(e.target===s||e.target.closest('[data-x]'))s.classList.remove('on')});
+    s.addEventListener('touchmove',e=>{if(e.target===s)e.preventDefault()},{passive:false})});
+  if(vv){vv.addEventListener('resize',fit);vv.addEventListener('scroll',fit)}
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')all.forEach(s=>s.classList.remove('on'))});sync()})();
 function fitText(){document.querySelectorAll('.wgrid .wt>*, #bal, #prow b').forEach(e=>{e.style.fontSize='';e.style.removeProperty('white-space');
   const label=e.tagName==='SMALL'||!!e.closest('.act'),min=label?11.5:10;let f=parseFloat(getComputedStyle(e).fontSize),n=0;
   while(e.scrollWidth>e.clientWidth+.5&&f>min&&n++<40){f-=.5;e.style.fontSize=f+'px'}
@@ -386,7 +417,7 @@ function openSheet(type,cat='',price='',tx=null){
   $('#nt').placeholder=type==='expense'&&!cat&&!tx?'What was it?':'Note (optional)';
   const custom=type==='expense'&&!cat&&!tx;$('#qrow').hidden=!custom;$('#qa').checked=false;$('#qp').hidden=true;$('#qpl').hidden=true;$('#qo').hidden=true;$('#qp').value='';$('#qic').hidden=true;$('#qil').hidden=true;$('#sv').textContent=T('Save');$('#ntl').textContent=type==='expense'?'Description':'Note';
   let qIcon='';                                                    // '' = automatic (closest match for the name, else the cart)
-  const icons=()=>{const auto=Core.qicon($('#nt').value.trim());$('#qic').innerHTML=`<button type="button" class="auto${qIcon?'':' on'}" data-e="">${T('Auto')} ${auto}</button>`+EMOJI.map(e=>`<button type="button" class="${qIcon===e?'on':''}" data-e="${e}">${e}</button>`).join('');
+  const icons=()=>{const auto=Core.qicon($('#nt').value.trim());$('#qic').innerHTML=`<button type="button" class="auto${qIcon?'':' on'}" data-e=""><span>${T('Auto')}</span><i>${auto}</i></button>`+EMOJI.map(e=>`<button type="button" class="${qIcon===e?'on':''}" data-e="${e}">${e}</button>`).join('');
     $('#qic').querySelectorAll('button').forEach(b=>b.onclick=()=>{qIcon=b.dataset.e;icons()})};
   $('#nt').oninput=()=>{if(custom&&$('#qa').checked&&!qIcon)icons()};
   $('#qa').onchange=()=>{const on=$('#qa').checked;$('#qp').hidden=!on;$('#qpl').hidden=!on;$('#qo').hidden=!on;$('#qic').hidden=!on;$('#qil').hidden=!on;if(on)icons();$('#sv').textContent=T(on?'Save Expense + Add to Quick Purchases':'Save');if(on&&!$('#qp').value)$('#qp').value=$('#amt').value};
