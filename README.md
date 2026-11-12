@@ -81,3 +81,18 @@ Food & groceries); "Custom item…" opens the expense form with "Add to Quick Pu
 icon chooser. "Edit prices" also shows a × on each tile to remove it (past transactions are unaffected).
 
 **Tests:** `npm test` → unit 23, database 32, UI 31.
+
+## Version 7 — Web Push (OneSignal)
+
+- `index.html` loads the OneSignal Web SDK v16 **after** the page has loaded and initialises it with the public
+  App ID / Safari Web ID. If the SDK cannot be fetched (offline, blocked) the app is unaffected.
+- Two service workers, two scopes: `sw.js` (scope `/`) still does offline + caching; OneSignal uses
+  `push/onesignal/OneSignalSDKWorker.js` (scope `/push/onesignal/`). `sw.js` never caches OneSignal requests.
+- Subscribing: the OneSignal bell (hidden once the device is subscribed) or **Settings → Turn on notifications**.
+  On iPhone/iPad push only works when the app was added to the Home Screen (iOS 16.4+).
+- OneSignal dashboard: the **Site URL** must be exactly the address the app is served from. If the web
+  configuration is "Typical Site", set under *Advanced Push Settings → Service Workers*: path `/push/onesignal/`,
+  filename `OneSignalSDKWorker.js`, scope `/push/onesignal/`.
+- No private OneSignal key is in the repository. Sending notifications from the backend would need the REST API key
+  in a server-side secret (e.g. a Supabase Edge Function), never in this frontend.
+- Tests: `npm test` → unit 23, database 32, UI 35.

@@ -304,12 +304,47 @@ await test('Arabic / RTL: mirrored navigation and rows, arrow points source → 
   ok(r.arrow,'transfer shows source ← destination');ok(r.iconRight,'row is mirrored');eq(r.nav,'الرئيسية');ok(r.del,'"Deleted user" is translated');ok(r.digits,'Arabic-Indic digits / currency');
   await p.page.click('#gear');const g=await p.page.evaluate(()=>{const a=document.querySelector('#menu').getBoundingClientRect();return a.left>=0&&a.left<innerWidth/2});ok(g,'settings menu opens on the leading (left) side in RTL');noErr(p);await p.close()});
 
+console.log('\nPush notifications (OneSignal)');
+/* cdn.onesignal.com is answered with a small stand-in that records how the app drives the SDK (the real SDK needs the real site address) */
+const STUB=`(()=>{const L=window.__os={init:[],calls:[],perm:false,opted:false,native:'default'};const ev={addEventListener(){}};
+ const OneSignal={init:async o=>{L.init.push(o)},Notifications:{get permission(){return L.perm},get permissionNative(){return L.native},isPushSupported:()=>!L.unsupported,
+   requestPermission:async()=>{L.calls.push('requestPermission');if(L.deny){L.native='denied'}else{L.perm=true;L.native='granted'}},addEventListener(){}},
+  User:{PushSubscription:{get optedIn(){return L.opted},optIn:async()=>{L.calls.push('optIn');L.opted=true},optOut:async()=>{L.calls.push('optOut');L.opted=false},addEventListener(){}}}};
+ const run=f=>Promise.resolve().then(()=>f(OneSignal));const q=window.OneSignalDeferred||[];window.OneSignalDeferred={push:run};q.forEach(run)})()`;
+const withSdk=async(p,mode)=>{await p.page.setRequestInterception(true);p.page.on('request',r=>{if(/onesignal\.com/.test(r.url())){mode==='block'?r.abort():r.respond({status:200,contentType:'text/javascript',body:STUB})}else r.continue()})};
+const menu=async p=>{await p.page.click('#gear');await p.wait(()=>!document.querySelector('#menu').hidden)};
+await test('SDK loads after the app, initialises once with the App ID, Safari ID and its own worker scope; no JavaScript errors',async()=>{
+  const p=await open({uid:O});await withSdk(p);await p.go();await p.dash();await p.status(/Online/);await p.wait(()=>window.__os&&window.__os.init.length===1);
+  const o=await p.page.evaluate(()=>{const o=window.__os.init[0];return{appId:o.appId,safari:o.safari_web_id,path:o.serviceWorkerPath,scope:o.serviceWorkerParam.scope,bell:o.notifyButton.enable,keys:Object.keys(o).sort()}});
+  eq(o,{appId:'80a0910d-f366-4e2a-9a97-ca1fb05b0fd4',safari:'web.onesignal.auto.4cbbb6e8-691d-4369-88f4-1bdd9ac43935',path:'push/onesignal/OneSignalSDKWorker.js',scope:'/push/onesignal/',bell:true,
+    keys:['allowLocalhostAsSecureOrigin','appId','notifyButton','safari_web_id','serviceWorkerParam','serviceWorkerPath']});
+  eq(await p.text('#bal'),'EGP 730.00');noErr(p);await p.close()});
+await test('permission flow from the settings menu: prompt → subscribed → can be turned off again; nothing is asked before the tap',async()=>{
+  const p=await open({uid:O});await withSdk(p);await p.go();await p.dash();await p.wait(()=>window.__os&&window.__os.init.length===1);
+  eq(await p.page.evaluate(()=>window.__os.calls),[],'no prompt on load:');await menu(p);await p.wait(()=>!document.querySelector('#pn').hidden);eq(await p.text('#pn'),'Turn on notifications');
+  await p.page.click('#pn');await p.wait(()=>window.__os.opted);eq(await p.page.evaluate(()=>window.__os.calls),['requestPermission','optIn']);ok(/are on/.test(await p.toast()));
+  await menu(p);eq(await p.text('#pn'),'Notifications: On');await p.page.click('#pn');await p.wait(()=>!window.__os.opted);ok(/are off/.test(await p.toast()));noErr(p);await p.close()});
+await test('permission refused → clear message, no subscription; Arabic labels',async()=>{
+  const p=await open({uid:O,lang:'ar'});await withSdk(p);await p.go();await p.dash();await p.wait(()=>window.__os&&window.__os.init.length===1);await p.page.evaluate(()=>{window.__os.deny=true});
+  eq(await p.page.evaluate(()=>window.__os.init[0].notifyButton.position),'bottom-left');
+  await menu(p);await p.wait(()=>!document.querySelector('#pn').hidden);eq(await p.text('#pn'),'تفعيل الإشعارات');await p.page.click('#pn');await p.wait(()=>window.__os.native==='denied');
+  await p.wait(()=>/محظورة/.test(document.querySelector('#toast').textContent));ok(!(await p.page.evaluate(()=>window.__os.opted)));await menu(p);eq(await p.text('#pn'),'الإشعارات: محظورة');noErr(p);await p.close()});
+await test('OneSignal unreachable (offline / blocked): the app is unaffected and the menu entry stays hidden',async()=>{
+  const p=await open({uid:O});await withSdk(p,'block');await p.go();await p.dash();await p.status(/Online/);await sleep(400);
+  await menu(p);ok(await p.page.$eval('#pn',e=>e.hidden));ok(await p.page.evaluate(()=>window.HTPush.state()===null));
+  await p.page.click('#menu #ac');await p.wait(()=>!document.querySelector('#more').hidden);noErr(p);await p.close()});
+
 console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v7'))return false;const c=await caches.open('ht-v7');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v8'))return false;const c=await caches.open('ht-v8');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
+  // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v8');await new Promise(r=>setTimeout(r,200));
+    return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
+      cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
+  eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');
   srv.dead=true;await p.cfg({down:true,auth:'netfail'});await p.net(false);
   await p.page.reload({waitUntil:'domcontentloaded'});await p.dash(3000);await p.status(/Offline/);eq(await p.text('#bal'),'EGP 730.00');noErr(p);
   srv.dead=false;srv.noSW=true;await p.close()});
