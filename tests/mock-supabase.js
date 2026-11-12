@@ -52,7 +52,7 @@ class Query{constructor(t){this.t=t;this.f=[];this.op='select';this.ord=[]}
       if(!member(d,r.household_id,me)||r.user_id!==me)return{data:null,error:{message:'new row violates row-level security policy',code:'42501'},status:403};
       const now=new Date().toISOString(),row={id:uuid(),...r,updated_at:now};d.transactions.push(row);const e=funds(d,null,row);if(e)return{data:null,error:e,status:400};save(d);return{data:null,error:null,status:201}}
     let rows=d[this.t].filter(vis).filter(r=>this.f.every(f=>f(r)));
-    if(this.op==='delete'){rows=rows.filter(r=>r.user_id===me||member(d,r.household_id,me).role==='owner');d[this.t]=d[this.t].filter(r=>!rows.includes(r));save(d);return{data:rows.map(r=>({id:r.id})),error:null,status:200}}
+    if(this.op==='delete'){if(this.t!=='quick_items')rows=rows.filter(r=>r.user_id===me||member(d,r.household_id,me).role==='owner');d[this.t]=d[this.t].filter(r=>!rows.includes(r));save(d);return{data:rows.map(r=>({id:r.id})),error:null,status:200}}
     if(this.op==='update'){if(this.t==='quick_items'){rows.forEach(r=>Object.assign(r,this.patch));save(d);return{data:rows,error:null,status:200}}
       rows=rows.filter(r=>r.user_id===me||member(d,r.household_id,me).role==='owner');const out=[];
       for(const r of rows){const old={...r};Object.assign(r,this.patch,{updated_at:new Date(Date.now()+1).toISOString()});const e=funds(d,old,r);if(e)return{data:null,error:e,status:400};out.push({id:r.id,updated_at:r.updated_at})}
@@ -70,6 +70,9 @@ const RPC={
     const grp=f=>Object.values(t.reduce((m,x)=>{const k=f(x);m[k]=m[k]||{name:k,total:0,n:0};m[k].total+=+x.amount;m[k].n++;return m},{}));
     return{income:d.transactions.filter(x=>x.household_id===h&&x.type==='income').reduce((a,x)=>a+ +x.amount,0),expenses:t.reduce((a,x)=>a+ +x.amount,0),count:t.length,by_cat:grp(x=>x.category),by_member:grp(nm),
       daily:t.length?[{d:today(),total:t.reduce((a,x)=>a+ +x.amount,0)}]:[],top:t.slice().sort((a,b)=>b.amount-a.amount).slice(0,5).map(x=>({category:x.category,amount:x.amount,pname:nm(x),wname:(d.wallets.find(w=>w.id===x.wallet_id)||{}).name,created_at:x.created_at}))}},
+  save_quick_item(d,me,{h,n,p,k,ic}){if(JSON.parse(localStorage.getItem('mock_cfg')||'{}').no009)return{__err:{message:'Could not find the function public.save_quick_item(h, ic, k, n, p) in the schema cache',code:'PGRST202'},__status:404};
+    const nm=String(n||'').trim();let q=(k&&d.quick_items.find(x=>x.household_id===h&&x.key===k))||d.quick_items.find(x=>x.household_id===h&&x.name.trim().toLowerCase()===nm.toLowerCase());
+    if(q){q.default_price=p;q.key=q.key||k||null;q.icon=ic||q.icon||null}else d.quick_items.push({id:uuid(),household_id:h,name:nm,default_price:p,key:k||null,icon:ic||null});return{created:!q}},
   upsert_quick_item(d,me,{h,n,p}){const q=d.quick_items.find(x=>x.household_id===h&&x.name.toLowerCase()===n.trim().toLowerCase());if(q)q.default_price=p;else d.quick_items.push({id:uuid(),household_id:h,name:n.trim(),default_price:p});return{created:!q}},
   create_household(d,me,{hname}){const h=uuid();d.households.push({id:h,name:hname,invite_code:h.slice(0,8)});d.members.push({household_id:h,user_id:me,role:'owner'});
     ['Household cash','Bank account','Personal cash'].forEach((n,i)=>d.wallets.push({id:uuid(),household_id:h,name:n,is_default:!i}));return h},
@@ -79,6 +82,6 @@ const RPC={
   remove_member(d,me,{h,uid:u}){d.members=d.members.filter(m=>!(m.household_id===h&&m.user_id===u));return null}};
 window.supabase={createClient(){return{auth,from:t=>new Query(t),
   rpc(n,a){return{then(x,y){return(async()=>{if(!await wire('rpc '+n))return netFail();const d=db(),me=uid();if(!me)return{data:null,error:{message:'JWT expired',code:'PGRST301'},status:401};
-    try{const r=RPC[n](d,me,a||{});save(d);return{data:r,error:null,status:200}}catch(e){return{data:null,error:e,status:400}}})().then(x,y)}}},
+    try{const r=RPC[n](d,me,a||{});if(r&&r.__err)return{data:null,error:r.__err,status:r.__status};save(d);return{data:r,error:null,status:200}}catch(e){return{data:null,error:e,status:400}}})().then(x,y)}}},
   channel(){const c={on(){return c},subscribe(f){setTimeout(()=>f&&f('SUBSCRIBED'),5);return c}};return c},removeChannel(){}}}};
 })();

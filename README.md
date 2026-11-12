@@ -59,3 +59,25 @@ Tests (`npm i` once): `npm test` runs
 - `tests/unit.test.js` – accounting rules, offline queue, sync and error attribution;
 - `tests/db.test.mjs` – the SQL files above on a real PostgreSQL (embedded binary), as the `authenticated` role with RLS: funds, concurrent spending, deletes, account deletion, permissions;
 - `tests/ui.test.mjs` – the real app in headless Chromium against a fake backend: startup (cached / slow / offline / expired / server down), deletes, offline queue, layout on iPhone / Android / iPad, safe areas, Arabic RTL, service worker.
+
+## Version 6 — Home redesign, Quick Purchase names, built-in catalog
+
+**Database:** run `009 quick purchase catalog.sql` in the Supabase SQL editor (after 008). It adds two nullable
+columns to `quick_items` (`key`, `icon`), tags the ten original starter items as built-in, and adds
+`save_quick_item()`. No names, prices, transactions, policies or grants change. The app also works *before* 009
+is run (it falls back to the older `upsert_quick_item`; chosen icons are then not stored).
+
+**Quick Purchase names**
+- The Arabic UI used to be produced by a find-and-replace over all on-screen text, and the dictionary contained the
+  starter item names. Any custom name containing one of those words ("Bread basket", "Fish food") was partly
+  rewritten on screen. Now user-entered text (custom item names, categories, notes, member names, renamed wallets)
+  is marked `data-nt` and never passes through that translator.
+- Built-in items carry a `key` and are shown in the app language from the catalog in `core.js` (`CATALOG`).
+  Custom items have no key and are always shown exactly as stored.
+- Icon = icon chosen by the user → built-in icon → closest match on the name (English or Arabic) → 🛒.
+
+**Home:** "Add item" (last tile in Quick Purchases) opens the built-in list (Bread, Vegetables, Fruits,
+Food & groceries); "Custom item…" opens the expense form with "Add to Quick Purchases" switched on, including an
+icon chooser. "Edit prices" also shows a × on each tile to remove it (past transactions are unaffected).
+
+**Tests:** `npm test` → unit 23, database 32, UI 31.

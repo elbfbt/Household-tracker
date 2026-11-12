@@ -74,5 +74,24 @@ test('dependent quick-purchase waits for its expense and is discarded together w
   const q=C.Queue(store(),'u1');const e=ins('expense',50,'pers');q.push(e);q.push({op:'qi',dep:e.client_id,name:'Shoes',price:50});const seen=[];
   await C.sync(q,'u1',env(async o=>{seen.push(C.opKind(o));return{error:{message:'Insufficient funds',code:'P0001'},status:400}}));eq(seen,['expense']);
   q.discard(e.client_id);eq(q.all().length,0)});
+const WANT={bread:['Bread','خبز','🍞'],tomatoes:['Tomatoes','طماطم','🍅'],potatoes:['Potatoes','بطاطس','🥔'],onions:['Onions','بصل','🧅'],cucumbers:['Cucumbers','خيار','🥒'],carrots:['Carrots','جزر','🥕'],
+ green_peppers:['Green Peppers','فلفل أخضر','🫑'],eggplant:['Eggplant','باذنجان','🍆'],zucchini:['Zucchini','كوسة','🥒'],molokhia:['Molokhia','ملوخية','🌿'],lettuce:['Lettuce','خس','🥬'],cabbage:['Cabbage','كرنب','🥬'],
+ garlic:['Garlic','ثوم','🧄'],peas:['Peas','بسلة','🫛'],green_beans:['Green Beans','فاصوليا خضراء','🫛'],spinach:['Spinach','سبانخ','🌿'],bananas:['Bananas','موز','🍌'],apples:['Apples','تفاح','🍎'],oranges:['Oranges','برتقال','🍊'],
+ mandarins:['Mandarins','يوسفي','🍊'],mango:['Mango','مانجو','🥭'],grapes:['Grapes','عنب','🍇'],guava:['Guava','جوافة','🍐'],strawberries:['Strawberries','فراولة','🍓'],watermelon:['Watermelon','بطيخ','🍉'],cantaloupe:['Cantaloupe','شمام','🍈'],
+ peaches:['Peaches','خوخ','🍑'],pomegranates:['Pomegranates','رمان','❤️'],chicken:['Chicken','فراخ','🍗'],meat:['Meat','لحمة','🥩'],fish:['Fish','سمك','🐟'],eggs:['Eggs','بيض','🥚'],milk:['Milk','لبن','🥛'],cheese:['Cheese','جبنة','🧀'],
+ yogurt:['Yogurt','زبادي','🥛'],rice:['Rice','رز','🍚'],pasta:['Pasta','مكرونة','🍝'],lentils:['Lentils','عدس','🫘'],beans:['Beans','فول','🫘'],cooking_oil:['Cooking Oil','زيت','🫗'],sugar:['Sugar','سكر','🧂'],flour:['Flour','دقيق','🌾']};
+test('built-in catalog: the 42 requested items, each with English name, Arabic name, icon and price; unique keys',()=>{
+  const pick=C.CATALOG.filter(c=>c.group!=='legacy');eq(pick.length,42);eq(new Set(C.CATALOG.map(c=>c.key)).size,C.CATALOG.length);
+  for(const [k,[en,ar,em]] of Object.entries(WANT)){const c=C.catByKey(k);ok(c,'missing '+k);eq([c.en,c.ar,c.emoji],[en,ar,em]);ok(c.price>0);ok(/^[a-z_]+$/.test(c.key))}
+  for(const c of C.CATALOG){ok(c.en&&c.ar&&c.emoji);eq(C.qicon({name:c.en,key:c.key}),c.emoji);eq(C.qicon(c.en),c.emoji,'by English name '+c.en);eq(C.qicon(c.ar),c.emoji,'by Arabic name '+c.ar)}});
+test('names: built-ins are shown per language by key; custom names are returned exactly as stored',()=>{
+  eq(C.qname({name:'Bread',key:'bread'},'ar'),'خبز');eq(C.qname({name:'Bread',key:'bread'},'en'),'Bread');eq(C.qname({name:'whatever',key:'mango'},'ar'),'مانجو');
+  for(const n of ['Bread basket','Fish food','bread','Milk','عيش فينو','  spaced  name ','Tomatoes'])for(const l of ['en','ar'])eq(C.qname({name:n,key:null,icon:null},l),n);
+  eq(C.qname({name:'Bread'},'ar'),'خبز','row from a database without the key column: original starter names are built-in');eq(C.qname({name:'Bread basket'},'ar'),'Bread basket');eq(C.qname({name:'bread '},'en'),'bread ');
+  eq(C.catLabel('Fish','ar'),'سمك');eq(C.catLabel('Fish food','ar'),'Fish food');eq(C.catLabel('Fish','en'),'Fish');eq(C.catLabel('سمك','en'),'سمك')});
+test('icons: chosen icon wins, then built-in, then closest match, then the cart; never empty',()=>{
+  eq(C.qicon({name:'Bread',key:'bread',icon:'🎁'}),'🎁');eq(C.qicon({name:'x',key:'mango',icon:' '}),'🥭');eq(C.qicon({name:'الطماطم'}),'🍅');eq(C.qicon('Green beans 1kg'),'🫛');eq(C.qicon('فول مدمس'),'🫘');
+  eq(C.qicon('Olive oil'),'🫗');eq(C.qicon('دجاج'),'🍗');eq(C.qicon('حليب'),'🥛');eq(C.qicon('شاي'),'☕');
+  for(const x of ['',null,undefined,{}, {name:''},'???','كرسي',42])eq(C.qicon(x),'🛒')});
 (async()=>{for(const [n,f] of tests){try{await f();pass++;console.log('  ok   '+n)}catch(e){fail++;console.log('  FAIL '+n+'\n       '+e.message)}}
   console.log(`\nunit: ${pass} passed, ${fail} failed`);if(fail)process.exitCode=1})();
