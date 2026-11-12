@@ -9,7 +9,7 @@ let H,O,M,D,W={};
 const add=(uid,type,amount,w1,w2=null,cat=type)=>one(uid,INS,[H,uid,W[w1],w2?W[w2]:null,type,amount,cat]).then(r=>r.id);
 const bals=async uid=>{const r=(await one(uid,'select wallet_balances($1) b',[H])).b;return Object.fromEntries(r.map(x=>[x.name,+x.balance]))};
 try{
-  await db.migrate(MIGRATIONS.slice(0,-1));   // everything up to 007 = the state in which the bug was reported
+  await db.migrate(MIGRATIONS.slice(0,7));   // everything up to 007 = the state in which the bug was reported
   O=await user('Owner');M=await user('Member');D=await user('Dad');
   H=(await one(O,"select create_household('Home') h")).h;
   const code=(await one(O,'select invite_code c from households where id=$1',[H])).c;
@@ -80,7 +80,7 @@ try{
     const r=await admin.query('update transactions set user_id=null where id=$1 returning user_id',[tMine]);await admin.query('rollback');
     eq(r.rowCount,1);eq(r.rows[0].user_id,null)});
 
-  await db.migrate(MIGRATIONS.slice(-1));     // apply 008
+  await db.migrate(MIGRATIONS.slice(7,8));    // apply 008
 
   console.log('\nAccount deletion');
   await test('owner with other members cannot delete their account; non-owners cannot remove members / delete the household',async()=>{
@@ -143,6 +143,43 @@ try{
     const r=(await as(O,"select name,default_price from quick_items where household_id=$1 and lower(name)='tuna'",[H])).rows;
     eq(r.length,1);eq(+r[0].default_price,45);
     eq((await admin.query('select count(*)::int n from transactions')).rows[0].n,n)});
+
+  console.log('\nQuick purchase catalog (009)');
+  await test('migration tags the originally seeded items as built-in and leaves custom items and prices alone',async()=>{
+    await as(M,'select upsert_quick_item($1,$2,$3)',[H,'Fish food',12]);                       // custom, created before 009
+    const before=(await admin.query('select name,default_price from quick_items where household_id=$1 order by name',[H])).rows;
+    await db.migrate(MIGRATIONS.slice(8));
+    const r=(await admin.query('select name,default_price,key,icon from quick_items where household_id=$1 order by name',[H])).rows;
+    eq(r.map(x=>[x.name,x.default_price]),before.map(x=>[x.name,x.default_price]),'names/prices untouched:');
+    eq(r.find(x=>x.name==='Bread').key,'bread');eq(r.find(x=>x.name==='Other groceries').key,'other_groceries');
+    eq(r.find(x=>x.name==='Fish food').key,null);eq(r.find(x=>x.name==='Tuna').key,null);ok(r.every(x=>x.icon===null))});
+  await test('custom item: stored exactly as typed (English or Arabic), no key, never duplicated, never a transaction',async()=>{
+    const n=(await admin.query('select count(*)::int n from transactions')).rows[0].n;
+    await as(M,'select save_quick_item($1,$2,$3)',[H,'Tomatoes',15]);await as(O,'select save_quick_item($1,$2,$3)',[H,' tomatoes ',18]);
+    await as(M,'select save_quick_item($1,$2,$3)',[H,'طماطم بلدي',22]);
+    const r=(await as(O,"select name,default_price,key from quick_items where household_id=$1 and (lower(name)='tomatoes' or name like 'طماطم%') order by name",[H])).rows;
+    eq(r.map(x=>[x.name,+x.default_price,x.key]),[['Tomatoes',18,null],['طماطم بلدي',22,null]]);
+    eq((await admin.query('select count(*)::int n from transactions')).rows[0].n,n)});
+  await test('built-in item: one row per key, price updates, an explicitly chosen icon is kept',async()=>{
+    await as(M,'select save_quick_item($1,$2,$3,$4)',[H,'Mango',60,'mango']);await as(O,'select save_quick_item($1,$2,$3,$4,$5)',[H,'Mango',75,'mango','🎁']);
+    await as(M,'select save_quick_item($1,$2,$3,$4)',[H,'Mango',80,'mango']);
+    const r=(await as(O,"select name,default_price,key,icon from quick_items where household_id=$1 and key='mango'",[H])).rows;
+    eq(r.map(x=>[x.name,+x.default_price,x.icon]),[['Mango',80,'🎁']]);
+    await as(M,'select save_quick_item($1,$2,$3,$4)',[H,'Tomatoes',16,'tomatoes']);            // picking the template adopts the same-named custom row instead of duplicating it
+    eq((await as(O,"select key,default_price from quick_items where household_id=$1 and lower(name)='tomatoes'",[H])).rows.map(x=>[x.key,+x.default_price]),[['tomatoes',16]])});
+  await test('quick purchases stay household-scoped and validated; the older RPC keeps working',async()=>{
+    const X=await user('Outsider');
+    await throws(()=>as(X,'select save_quick_item($1,$2,$3)',[H,'Hack',1]),/not a member/);
+    await throws(()=>as(null,'select save_quick_item($1,$2,$3)',[H,'Hack',1]),/not signed in/);
+    await throws(()=>as(M,'select save_quick_item($1,$2,$3,$4)',[H,'x',1,'Bad Key!']),/invalid quick purchase key/);
+    await throws(()=>as(M,'select save_quick_item($1,$2,$3)',[H,'x',-1]),/invalid price/);
+    eq((await as(X,'select count(*)::int n from quick_items where household_id=$1',[H])).rows[0].n,0);
+    await as(M,'select upsert_quick_item($1,$2,$3)',[H,'Tuna',33]);eq(+(await as(M,"select default_price p from quick_items where household_id=$1 and name='Tuna'",[H])).rows[0].p,33);
+    eq((await as(M,"delete from quick_items where household_id=$1 and name='Tuna' returning id",[H])).rowCount,1)});
+  await test('new households get the ten starter items tagged as built-in',async()=>{
+    const X=await user('Fresh');const h2=(await one(X,"select create_household('New') h")).h;
+    const r=(await as(X,'select name,key from quick_items where household_id=$1',[h2])).rows;eq(r.length,10);ok(r.every(x=>x.key));
+    eq((await as(X,'select count(*)::int n from wallets where household_id=$1',[h2])).rows[0].n,3)});
 
   console.log('\nOwnership / orphans');
   await test('account deleted from the Supabase dashboard also leaves entries as "Deleted user" (used to fail)',async()=>{

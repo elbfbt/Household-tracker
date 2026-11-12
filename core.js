@@ -72,13 +72,46 @@ async function sync(q,uid,env){const res={synced:0,failed:0,conflict:0,stopped:n
     if(k==='auth'){res.stopped='auth';break}
     const msg=String((r.error&&r.error.message)||r.error);q.mark(o.qid,'failed',msg);res.errors.push({...describe(o),message:msg});res.failed++}
   return res}
-/* ---- Quick Purchase icon: derived from the NAME (no stored image), always returns something ---- */
-const QI=[[/bread|bakery|toast|خبز|عيش|توست|فينو|مخبز/i,'🍞'],[/chicken|poultry|فراخ|دجاج|فرخة/i,'🍗'],[/egg|بيض/i,'🥚'],[/fish|tuna|shrimp|سمك|جمبري|تونة/i,'🐟'],
-[/milk|dairy|cheese|yogh?urt|لبن|حليب|جبن|زبادي/i,'🥛'],[/\brice\b|pasta|macaroni|noodle|أرز|ارز|\bرز\b|مكرونة|مكرونه/i,'🍚'],[/meat|beef|lamb|كفتة|لحم|لحمة|بانيه/i,'🥩'],
-[/vegetable|\bveg\b|tomato|potato|onion|salad|خضار|خضروات|طماطم|بطاطس|بصل|خيار/i,'🥬'],[/fruit|apple|banana|orange|mango|فاكهة|فواكه|تفاح|موز|برتقال|مانجو/i,'🍎'],
-[/coffee|\btea\b|قهوة|شاي/i,'☕'],[/water|juice|soda|drink|مياه|مية|عصير|مشروب/i,'🥤'],[/\boil\b|sugar|salt|flour|زيت|سكر|ملح|دقيق/i,'🧂'],
-[/soap|clean|detergent|صابون|منظف|نظافة/i,'🧼'],[/medic|pharm|دواء|علاج|صيدلية/i,'💊'],[/fuel|petrol|\bgas\b|taxi|uber|\bbus\b|بنزين|مواصلات|تاكسي/i,'🚗']];
-const qicon=n=>{const s=String(n||'');for(const [r,e] of QI)if(r.test(s))return e;return'🛒'};
-const api={cents,sign,effects,pendingEffects,balances,cairoYmd,addDays,periods,cairoStart,spendDeltas,num,qicon,classify,Queue,foreign,sync,opKind,describe,MOVES:['withdraw','deposit','transfer']};
+/* ---- Quick Purchases: built-in catalog (key, English, Arabic, emoji, group, suggested price, other spellings) ----
+   A built-in item is identified by its KEY and shown in the UI language. A custom item has no key and is ALWAYS
+   shown exactly as the user typed it (never translated). The icon is: explicit choice > catalog > closest match > cart. */
+const CATALOG=[
+['bread','Bread','خبز','🍞','bread',20,'bakery|toast|baladi|عيش|فينو|توست'],
+['tomatoes','Tomatoes','طماطم','🍅','veg',15,'tomato|قوطه'],['potatoes','Potatoes','بطاطس','🥔','veg',20,'potato|بطاطا'],['onions','Onions','بصل','🧅','veg',20,'onion'],
+['cucumbers','Cucumbers','خيار','🥒','veg',20,'cucumber'],['carrots','Carrots','جزر','🥕','veg',20,'carrot'],['green_peppers','Green Peppers','فلفل أخضر','🫑','veg',30,'green pepper|peppers|pepper|فلفل'],
+['eggplant','Eggplant','باذنجان','🍆','veg',20,'eggplants|aubergine|بتنجان'],['zucchini','Zucchini','كوسة','🥒','veg',30,'courgette|كوسا'],['molokhia','Molokhia','ملوخية','🌿','veg',20,'mulukhiyah|molokhiya'],
+['lettuce','Lettuce','خس','🥬','veg',15,''],['cabbage','Cabbage','كرنب','🥬','veg',25,'ملفوف'],['garlic','Garlic','ثوم','🧄','veg',30,'توم'],['peas','Peas','بسلة','🫛','veg',50,'pea|بازلاء'],
+['green_beans','Green Beans','فاصوليا خضراء','🫛','veg',40,'green bean|فاصوليا'],['spinach','Spinach','سبانخ','🌿','veg',20,''],
+['bananas','Bananas','موز','🍌','fruit',35,'banana'],['apples','Apples','تفاح','🍎','fruit',70,'apple'],['oranges','Oranges','برتقال','🍊','fruit',25,'orange'],['mandarins','Mandarins','يوسفي','🍊','fruit',30,'mandarin|tangerine|tangerines|يوسف افندي'],
+['mango','Mango','مانجو','🥭','fruit',60,'mangoes|mangos|مانجا|منجه'],['grapes','Grapes','عنب','🍇','fruit',60,'grape'],['guava','Guava','جوافة','🍐','fruit',35,'guavas'],['strawberries','Strawberries','فراولة','🍓','fruit',50,'strawberry'],
+['watermelon','Watermelon','بطيخ','🍉','fruit',80,'watermelons'],['cantaloupe','Cantaloupe','شمام','🍈','fruit',50,'melon|كانتلوب'],['peaches','Peaches','خوخ','🍑','fruit',60,'peach'],['pomegranates','Pomegranates','رمان','❤️','fruit',50,'pomegranate'],
+['chicken','Chicken','فراخ','🍗','food',180,'poultry|دجاج|فرخه|بانيه'],['meat','Meat','لحمة','🥩','food',300,'beef|lamb|لحم|كفته'],['fish','Fish','سمك','🐟','food',250,'tuna|shrimp|جمبري|تونه|بلطي'],['eggs','Eggs','بيض','🥚','food',60,'egg'],
+['milk','Milk','لبن','🥛','food',50,'dairy|حليب'],['cheese','Cheese','جبنة','🧀','food',80,'جبن'],['yogurt','Yogurt','زبادي','🥛','food',15,'yoghurt'],['rice','Rice','رز','🍚','food',40,'ارز'],
+['pasta','Pasta','مكرونة','🍝','food',25,'macaroni|noodles|noodle|spaghetti|معكرونه'],['lentils','Lentils','عدس','🫘','food',60,'lentil'],['beans','Beans','فول','🫘','food',20,'fava|foul'],
+['cooking_oil','Cooking Oil','زيت','🫗','food',90,'oil'],['sugar','Sugar','سكر','🧂','food',40,''],['flour','Flour','دقيق','🌾','food',30,'طحين'],
+// seeded by older versions; kept so they stay translated and keep an icon (not offered in the picker)
+['vegetables','Vegetables','خضار','🥬','legacy',60,'vegetable|veg|خضروات'],['fruits','Fruits','فاكهة','🍎','legacy',80,'fruit|فواكه'],['other_groceries','Other groceries','بقالة أخرى','🛒','legacy',50,'groceries|grocery|بقاله']
+].map(([key,en,ar,emoji,group,price,alt])=>({key,en,ar,emoji,group,price,alt:alt?alt.split('|'):[]}));
+// compare names loosely: case, Arabic diacritics / alef / ta-marbuta / ya variants, leading "al-"
+const norm=s=>String(s==null?'':s).toLowerCase().replace(/[\u064B-\u0652\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[^a-z0-9\u0621-\u064A]+/g,' ').trim().split(' ').map(w=>w.replace(/^ال(?=..)/,'')).join(' ');
+const BYKEY={},EXACT={},WORDS=[];
+CATALOG.forEach(c=>{BYKEY[c.key]=c;[c.en,c.ar].forEach(n=>{EXACT[norm(n)]=c});[c.en,c.ar,...c.alt].forEach(n=>WORDS.push([' '+norm(n)+' ',c]))});
+WORDS.sort((a,b)=>b[0].length-a[0].length);                      // "green beans" before "beans"
+const catByKey=k=>BYKEY[k]||null;
+const catByName=n=>EXACT[norm(n)]||null;                         // exact built-in name (either language)
+const catGuess=n=>{const s=' '+norm(n)+' ';if(s==='  ')return null;if(EXACT[s.trim()])return EXACT[s.trim()];for(const [w,c] of WORDS)if(s.includes(w))return c;return null};
+const QI=[[/coffee|\btea\b|قهوة|شاي/i,'☕'],[/water|juice|soda|drink|مياه|مية|عصير|مشروب/i,'🥤'],[/\bsalt\b|spice|ملح|بهارات|توابل/i,'🧂'],
+[/soap|clean|detergent|shampoo|صابون|منظف|نظافة|شامبو/i,'🧼'],[/medic|pharm|دواء|علاج|صيدلية/i,'💊'],[/fuel|petrol|\bgas\b|taxi|uber|\bbus\b|بنزين|مواصلات|تاكسي/i,'🚗'],
+[/sweet|candy|chocolate|biscuit|cake|حلويات|شوكولاتة|بسكويت|كيك/i,'🍫'],[/butter|ghee|زبدة|سمنة|سمن/i,'🧈'],[/diaper|baby|حفاضات|بامبرز/i,'🍼'],[/bill|electric|internet|phone|فاتورة|كهرباء|نت|رصيد/i,'🧾']];
+/* item = a quick_items row ({name,key,icon}) or just a name. Never returns an empty icon. */
+const qicon=x=>{const it=x&&typeof x==='object'?x:{name:x};if(it.icon&&String(it.icon).trim())return String(it.icon).trim();
+  const c=(it.key&&BYKEY[it.key])||catGuess(it.name);if(c)return c.emoji;const s=String(it.name||'');for(const [r,e] of QI)if(r.test(s))return e;return'🛒'};
+/* which built-in (if any) a stored row is. Rows from before migration 009 have no "key" column at all: there the
+   original seeded English names are the built-ins. A row WITH the column and key=null is custom -> never translated. */
+const qbuiltin=it=>!it?null:it.key?(BYKEY[it.key]||null):('key' in it?null:(()=>{const c=EXACT[norm(it.name)];return c&&c.en===String(it.name)?c:null})());
+const qname=(it,lang)=>{const c=qbuiltin(it);return c?(lang==='ar'?c.ar:c.en):String((it&&it.name)||'')};
+/* a transaction's category is stored text; built-in purchases store the catalog's English name -> show it localized */
+const catLabel=(cat,lang)=>{if(lang!=='ar')return String(cat||'');const c=EXACT[norm(cat)];return c&&c.en===String(cat)?c.ar:String(cat||'')};
+const api={cents,sign,effects,pendingEffects,balances,cairoYmd,addDays,periods,cairoStart,spendDeltas,num,qicon,qname,qbuiltin,catLabel,catByKey,catByName,catGuess,CATALOG,norm,classify,Queue,foreign,sync,opKind,describe,MOVES:['withdraw','deposit','transfer']};
 g.Core=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

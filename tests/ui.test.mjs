@@ -34,7 +34,7 @@ let n=0;const tx=(user_id,type,amount,wallet_id,to_wallet_id,category,min)=>{n++
 const seed=()=>{n=0;return{users:[{id:O,email:'owner@t.io',password:'secret1',name:'Omar'},{id:M,email:'mona@t.io',password:'secret1',name:'Mona'}],
   households:[{id:H,name:'Home',invite_code:'abcd1234'}],members:[{household_id:H,user_id:O,role:'owner'},{household_id:H,user_id:M,role:'member'}],
   wallets:[{id:WC,household_id:H,name:'Household cash',is_default:true},{id:WB,household_id:H,name:'Bank account'},{id:WP,household_id:H,name:'Personal cash'}],
-  quick_items:['Bread:20','Chicken:180','Fish:250','Milk:50','Rice:40','Vegetables:60'].map((x,i)=>({id:'q'+i,household_id:H,name:x.split(':')[0],default_price:+x.split(':')[1]})),
+  quick_items:['Bread:20','Chicken:180','Fish:250','Milk:50','Rice:40','Vegetables:60'].map((x,i)=>({id:'q'+i,household_id:H,name:x.split(':')[0],default_price:+x.split(':')[1],key:x.split(':')[0].toLowerCase(),icon:null})),
   transactions:[tx(O,'income',1000,WB,null,'Add income',600),tx(O,'withdraw',500,WB,WC,'Withdraw cash',500),
     tx(null,'transfer',200,WC,WP,'Transfer',400),      // made by an account that was deleted later  -> id ...003
     tx(null,'expense',190,WP,null,'Fish',300),         // deleted user's purchase: Personal cash is now 10 -> id ...004
@@ -45,7 +45,7 @@ const VP={iphone:{width:390,height:844,deviceScaleFactor:2,isMobile:true,hasTouc
 
 async function open({uid=null,lang='en',vp='iphone',cfg={},url='',inset=0,standalone=false,offline=false}={}){
   const ctx=await browser.createBrowserContext(),page=await ctx.newPage();await page.setViewport(VP[vp]);
-  const dialogs=[];page.on('dialog',async d=>{dialogs.push(d.message());await d.accept()});
+  const dialogs=[];page.on('dialog',async d=>{dialogs.push(d.message());await (d.type()==='prompt'?d.accept(d.defaultValue()):d.accept())});
   const errors=[];page.on('pageerror',e=>errors.push(String(e&&e.message||e)));page.on('console',m=>{if(m.type()==='error'&&!/404|Failed to load resource|ERR_/.test(m.text()))errors.push('console: '+m.text())});
   await page.evaluateOnNewDocument((s,uid,lang,cfg,sess,offline)=>{
     Object.defineProperty(Navigator.prototype,'onLine',{configurable:true,get:()=>localStorage.getItem('__offline')!=='1'});
@@ -59,7 +59,7 @@ async function open({uid=null,lang='en',vp='iphone',cfg={},url='',inset=0,standa
     go:async(u=url)=>{await page.goto(BASE+u,{waitUntil:'domcontentloaded'})},
     text:sel=>page.$eval(sel,e=>e.textContent.replace(/\u00a0/g,' ').trim()).catch(()=>null),
     has:sel=>page.$(sel).then(x=>!!x),
-    wait:(fn,arg,timeout=6000)=>page.waitForFunction(fn,{timeout,polling:20},arg),
+    wait:(fn,arg,timeout=6000,...more)=>page.waitForFunction(fn,{timeout,polling:20},arg,...more),
     dash:(timeout=6000)=>page.waitForFunction(()=>{const b=document.querySelector('#bal');return b&&/[\d٠-٩]/.test(b.textContent)},{timeout,polling:10}),
     status:(re,timeout=6000)=>page.waitForFunction(s=>{const e=document.querySelector('#ns');return e&&new RegExp(s).test(e.textContent)},{timeout,polling:20},re.source),
     cfg:c=>page.evaluate(c=>{Object.assign(window.__cfg,c);localStorage.setItem('mock_cfg',JSON.stringify(window.__cfg))},c),
@@ -195,6 +195,76 @@ await test('owner who still has members is told why the account cannot be delete
   const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);await p.page.click('#gear');await p.page.click('#ac');await p.page.type('#dc','DELETE');await p.page.click('#dd');
   await p.wait(()=>/still has other members/.test(document.querySelector('#de').textContent));ok(await p.page.evaluate(()=>!!localStorage.getItem('ht-auth')));await p.close()});
 
+console.log('\nQuick Purchases: names, languages, icons');
+const cards=p=>p.page.evaluate(()=>[...document.querySelectorAll('#qi .qc:not(.add)')].map(c=>({icon:c.querySelector('.qe').textContent.trim(),name:c.querySelector('b').textContent,price:c.querySelector('small').textContent.replace(/\u00a0/g,' ')})));
+const sheetOn=p=>p.wait(()=>document.querySelector('#sh').classList.contains('on'));
+const addQuickOnly=async(p,name,price,icon)=>{await p.page.click('[data-t="expense"]');await sheetOn(p);await p.page.$eval('#nt',(e,v)=>{e.value=v;e.dispatchEvent(new Event('input'))},name);
+  await p.page.click('#qa');await p.page.$eval('#qp',(e,v)=>e.value=v,String(price));if(icon)await p.page.click(`#qic [data-e="${icon}"]`);await p.page.click('#qo');
+  await p.wait((n,pr)=>JSON.parse(localStorage.getItem('mock_db')).quick_items.some(q=>q.name.toLowerCase()===n.toLowerCase()&&q.default_price===+pr),name,6000,price);await p.status(/Online|متصل/)};
+const lang=async(p,to)=>{await p.page.evaluate(l=>localStorage.setItem('ht_lang',l),to);await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.wait(()=>document.querySelectorAll('#qi .qc:not(.add)').length>0)};
+const CUSTOM_EN=['Bread basket','Fish food','Milk Chocolate (Mona)','Rice & Vegetables mix','Transfer fee','Kiri'],CUSTOM_AR=['عيش فينو','شاي العروسة','حاجات البيت'];
+await test('custom item created in English keeps its exact name after switching to Arabic (built-ins are translated)',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);const d0=await p.db(),bal=await p.text('#bal');
+  for(const n of CUSTOM_EN)await addQuickOnly(p,n,12);
+  eq((await p.db()).transactions.length,d0.transactions.length,'no transaction created:');eq(await p.text('#bal'),bal,'balance unchanged:');
+  let c=await cards(p);for(const n of CUSTOM_EN)ok(c.some(x=>x.name===n),'shown in English: '+n);
+  await lang(p,'ar');c=await cards(p);
+  for(const n of CUSTOM_EN)ok(c.some(x=>x.name===n),`"${n}" must be unchanged in Arabic, got: ${c.map(x=>x.name).join(' | ')}`);
+  for(const n of ['خبز','فراخ','سمك','لبن','رز','خضار'])ok(c.some(x=>x.name===n),'built-in translated: '+n);
+  eq(await p.page.evaluate(()=>document.documentElement.dir),'rtl');ok(c.every(x=>x.icon),'every card has an icon');
+  eq((await p.db()).quick_items.filter(q=>CUSTOM_EN.includes(q.name)).map(q=>q.key),CUSTOM_EN.map(()=>null),'stored as custom, name untouched:');
+  await p.page.evaluate(()=>[...document.querySelectorAll('#qi .qc b')].find(b=>b.textContent==='Bread basket').click());await sheetOn(p);
+  eq(await p.text('#st'),'Bread basket','sheet title:');noErr(p);await p.close()});
+await test('custom item created in Arabic keeps its exact name after switching to English, and gets a matching icon',async()=>{
+  const p=await open({uid:M,lang:'ar'});await p.go();await p.dash();const n0=(await p.db()).transactions.length;
+  for(const n of CUSTOM_AR)await addQuickOnly(p,n,15);
+  let c=await cards(p);for(const n of CUSTOM_AR)ok(c.some(x=>x.name===n),'shown in Arabic: '+n);
+  eq(await p.page.evaluate(()=>[...document.querySelectorAll('#qi .qc b')].find(b=>b.textContent==='عيش فينو').getAttribute('dir')),'auto');
+  await lang(p,'en');c=await cards(p);
+  for(const n of CUSTOM_AR)ok(c.some(x=>x.name===n),`"${n}" must be unchanged in English, got: ${c.map(x=>x.name).join(' | ')}`);
+  eq(c.find(x=>x.name==='عيش فينو').icon,'🍞');eq(c.find(x=>x.name==='شاي العروسة').icon,'☕');eq(c.find(x=>x.name==='حاجات البيت').icon,'🛒','fallback icon:');
+  ok(c.some(x=>x.name==='Bread')&&c.some(x=>x.name==='Vegetables'));eq((await p.db()).transactions.length,n0);
+  eq((await p.db()).quick_items.filter(q=>CUSTOM_AR.includes(q.name)).length,3);noErr(p);await p.close()});
+await test('tapping a Quick Purchase (in Arabic) creates one real expense at its default price; names in Recent / History stay correct',async()=>{
+  const p=await open({uid:M,lang:'ar'});await p.go();await p.dash();await addQuickOnly(p,'Bread basket',12);const n0=(await p.db()).transactions.length;
+  await p.page.evaluate(()=>[...document.querySelectorAll('#qi .qc b')].find(b=>b.textContent==='خبز').click());await sheetOn(p);
+  eq(await p.page.$eval('#amt',e=>e.value),'20');eq(await p.text('#st'),'خبز');await p.page.click('#sv');
+  await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);
+  await p.page.evaluate(()=>[...document.querySelectorAll('#qi .qc b')].find(b=>b.textContent==='Bread basket').click());await sheetOn(p);await p.page.click('#sv');
+  await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+2,n0);await p.status(/متصل/);
+  const t=(await p.db()).transactions.slice(-2);eq(t.map(x=>[x.type,x.amount,x.category,x.user_id]),[['expense',20,'Bread',M],['expense',12,'Bread basket',M]]);
+  await p.wait(()=>[...document.querySelectorAll('#tl .tm b')].some(b=>b.textContent==='Bread basket'));
+  const names=await p.page.evaluate(()=>[...document.querySelectorAll('#tl .tm b')].map(b=>b.textContent));ok(names.includes('Bread basket')&&names.includes('خبز'),names.join(' | '));
+  await p.page.click('#nv [data-n="hist"]');await p.wait(()=>document.querySelectorAll('#hl .tm b').length>3);
+  const h=await p.page.evaluate(()=>[...document.querySelectorAll('#hl .tm b')].map(b=>b.textContent));ok(h.includes('Bread basket')&&h.includes('خبز')&&h.includes('سمك'),h.join(' | '));noErr(p);await p.close()});
+await test('built-in list: add from the template sheet (localized, with icon, no transaction, no duplicates); remove an item',async()=>{
+  const p=await open({uid:M,lang:'ar'});await p.go();await p.dash();const n0=(await p.db()).transactions.length;
+  await p.status(/متصل/);await p.page.$eval('#qadd',e=>e.click());await p.wait(()=>document.querySelector('#qs').classList.contains('on'));
+  const tp=await p.page.evaluate(()=>[...document.querySelectorAll('#qsl [data-k]')].map(b=>({k:b.dataset.k,icon:b.children[0].textContent.trim(),name:b.children[1].textContent.trim(),off:b.disabled})));
+  eq(tp.length,42);ok(tp.every(x=>x.icon&&x.name&&/[\u0600-\u06FF]/.test(x.name)),'every template has an Arabic name and an icon');
+  ok(tp.find(x=>x.k==='bread').off&&!tp.find(x=>x.k==='mango').off,'already-added items cannot be added twice');
+  await p.page.$eval('#qsl [data-k="mango"]',e=>e.click());await p.wait(()=>JSON.parse(localStorage.getItem('mock_db')).quick_items.some(q=>q.key==='mango'));
+  await p.page.$eval('#qsd',e=>e.click());await p.wait(()=>[...document.querySelectorAll('#qi .qc b')].some(b=>b.textContent==='مانجو'));
+  const m=(await p.db()).quick_items.filter(q=>q.key==='mango');eq(m.map(q=>[q.name,q.default_price]),[['Mango',60]]);eq((await p.db()).transactions.length,n0);
+  eq((await cards(p)).find(x=>x.name==='مانجو').icon,'🥭');
+  await lang(p,'en');ok((await cards(p)).some(x=>x.name==='Mango'));
+  await addQuickOnly(p,'mango',70);eq((await p.db()).quick_items.filter(q=>/mango/i.test(q.name)).map(q=>[q.name,q.key,q.default_price]),[['Mango','mango',70]],'typing a built-in name updates it instead of duplicating:');
+  await p.page.click('#ed');await p.wait(()=>!!document.querySelector('#qi [data-del]'));
+  await p.page.evaluate(()=>[...document.querySelectorAll('#qi .qc')].find(c=>c.querySelector('b').textContent==='Mango').querySelector('[data-del]').click());
+  await p.wait(()=>!JSON.parse(localStorage.getItem('mock_db')).quick_items.some(q=>q.key==='mango'));eq((await p.db()).transactions.length,n0);noErr(p);await p.close()});
+await test('a chosen icon is kept; expense + "add to Quick Purchases" saves one expense and one item at the default price',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await p.status(/Online/);await addQuickOnly(p,'Gift for mum',100,'🎁');
+  eq((await cards(p)).find(x=>x.name==='Gift for mum').icon,'🎁');eq((await p.db()).quick_items.find(q=>q.name==='Gift for mum').icon,'🎁');
+  const n0=(await p.db()).transactions.length;await p.page.click('[data-t="expense"]');await sheetOn(p);ok(!(await p.page.$eval('#qa',e=>e.checked)),'off by default');
+  await p.page.$eval('#amt',e=>e.value='45');await p.page.$eval('#nt',e=>e.value='Koshary');await p.page.click('#qa');await p.page.$eval('#qp',e=>e.value='40');await p.page.click('#sv');
+  await p.wait(()=>JSON.parse(localStorage.getItem('mock_db')).quick_items.some(q=>q.name==='Koshary'));const d=await p.db();
+  eq(d.transactions.length,n0+1);eq([d.transactions.at(-1).amount,d.transactions.at(-1).category],[45,'Koshary']);eq(d.quick_items.filter(q=>q.name==='Koshary').map(q=>q.default_price),[40]);noErr(p);await p.close()});
+await test('database not yet on migration 009: items still save (older function), starter items are still translated',async()=>{
+  const p=await open({uid:M,lang:'ar',cfg:{no009:true}});await p.go();await p.dash();
+  await p.setDb(d=>d.quick_items.forEach(q=>{delete q.key;delete q.icon}));await lang(p,'ar');
+  await addQuickOnly(p,'Bread basket',12);const c=await cards(p);ok(c.some(x=>x.name==='Bread basket')&&c.some(x=>x.name==='خبز'),c.map(x=>x.name).join(' | '));ok(c.every(x=>x.icon));
+  ok(await p.page.evaluate(()=>window.__calls.some(c=>c.name==='rpc upsert_quick_item')),'fell back to the older function');noErr(p);await p.close()});
+
 console.log('\nLayout: bottom navigation, spacing, safe areas, RTL');
 const metrics=p=>p.page.evaluate(()=>{const r=s=>{const e=document.querySelector(s);return e?e.getBoundingClientRect():null},nv=r('#nv'),btn=[...document.querySelectorAll('#nv button')].map(b=>b.getBoundingClientRect());
   const secs=[...document.querySelectorAll('#home .sec')].map(e=>Math.round(e.getBoundingClientRect().top+scrollY));
@@ -238,7 +308,7 @@ console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v6'))return false;const c=await caches.open('ht-v6');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v7'))return false;const c=await caches.open('ht-v7');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   srv.dead=true;await p.cfg({down:true,auth:'netfail'});await p.net(false);
   await p.page.reload({waitUntil:'domcontentloaded'});await p.dash(3000);await p.status(/Offline/);eq(await p.text('#bal'),'EGP 730.00');noErr(p);
