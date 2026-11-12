@@ -53,18 +53,24 @@ function Queue(store,uid){if(!uid)throw new Error('Queue needs a user id');
     rebase(id,base){wr(rd(key).map(o=>o.op==='upd'&&o.id===id&&o.state==='pending'?{...o,base}:o))}}}
 function foreign(store,uid){let ix=[];try{ix=JSON.parse(store.getItem('ht_qusers')||'[]')}catch(e){}
   return ix.filter(u=>u!==uid).map(u=>{let a=[];try{a=JSON.parse(store.getItem('ht_q:'+u)||'[]')}catch(e){}return{uid:u,count:a.length}}).filter(x=>x.count)}
-async function sync(q,uid,env){const res={synced:0,failed:0,conflict:0,stopped:null,errors:[]};
+/* what a queued operation IS, so an error is always attributed to the operation that actually failed */
+function opKind(o){return o.op==='qi'?'qi':o.op==='del'?'del':o.op==='upd'?'upd':(o.type||'expense')}
+function describe(o){const k=opKind(o),src=o.op==='del'||o.op==='upd'?(o.old||{}):o;
+  return{qid:o.qid,kind:k,name:k==='qi'?o.name:(src.category||src.type||''),amount:k==='qi'?o.price:(o.op==='upd'&&o.patch&&o.patch.amount!=null?o.patch.amount:src.amount)}}
+async function sync(q,uid,env){const res={synced:0,failed:0,conflict:0,stopped:null,errors:[],conflicts:[]};
   for(const id of q.all().map(x=>x.qid)){const o=q.all().find(x=>x.qid===id);if(!o||o.state!=='pending'||o.uid!==uid)continue;
     if(o.dep&&q.all().some(x=>x.qid===o.dep))continue;
     if(!env.online()){res.stopped='network';break}
-    if(await env.sessionUid()!==uid){res.stopped='auth';break}
+    // a session lookup that FAILS (throws: offline / flaky network) is not the same as "signed out"
+    let su;try{su=await env.sessionUid()}catch(e){res.stopped='network';break}
+    if(su!==uid){res.stopped='auth';break}
     let r;try{r=await env.exec(o)}catch(e){r={error:e}}
-    if(r.conflict){q.mark(o.qid,'conflict',r.message);res.conflict++;continue}
+    if(r.conflict){q.mark(o.qid,'conflict',r.message);res.conflict++;res.conflicts.push({...describe(o),message:r.message||''});continue}
     const k=classify(r.error,r.status);
     if(k==='ok'||k==='duplicate'){q.remove(o.qid);res.synced++;if(o.op==='upd'&&r.updated_at)q.rebase(o.id,r.updated_at);continue}
     if(k==='network'){q.bump(o.qid);res.stopped='network';break}
     if(k==='auth'){res.stopped='auth';break}
-    const msg=String((r.error&&r.error.message)||r.error);q.mark(o.qid,'failed',msg);res.errors.push(msg);res.failed++}
+    const msg=String((r.error&&r.error.message)||r.error);q.mark(o.qid,'failed',msg);res.errors.push({...describe(o),message:msg});res.failed++}
   return res}
 /* ---- Quick Purchase icon: derived from the NAME (no stored image), always returns something ---- */
 const QI=[[/bread|bakery|toast|خبز|عيش|توست|فينو|مخبز/i,'🍞'],[/chicken|poultry|فراخ|دجاج|فرخة/i,'🍗'],[/egg|بيض/i,'🥚'],[/fish|tuna|shrimp|سمك|جمبري|تونة/i,'🐟'],
@@ -73,6 +79,6 @@ const QI=[[/bread|bakery|toast|خبز|عيش|توست|فينو|مخبز/i,'🍞'
 [/coffee|\btea\b|قهوة|شاي/i,'☕'],[/water|juice|soda|drink|مياه|مية|عصير|مشروب/i,'🥤'],[/\boil\b|sugar|salt|flour|زيت|سكر|ملح|دقيق/i,'🧂'],
 [/soap|clean|detergent|صابون|منظف|نظافة/i,'🧼'],[/medic|pharm|دواء|علاج|صيدلية/i,'💊'],[/fuel|petrol|\bgas\b|taxi|uber|\bbus\b|بنزين|مواصلات|تاكسي/i,'🚗']];
 const qicon=n=>{const s=String(n||'');for(const [r,e] of QI)if(r.test(s))return e;return'🛒'};
-const api={cents,sign,effects,pendingEffects,balances,cairoYmd,addDays,periods,cairoStart,spendDeltas,num,qicon,classify,Queue,foreign,sync,MOVES:['withdraw','deposit','transfer']};
+const api={cents,sign,effects,pendingEffects,balances,cairoYmd,addDays,periods,cairoStart,spendDeltas,num,qicon,classify,Queue,foreign,sync,opKind,describe,MOVES:['withdraw','deposit','transfer']};
 g.Core=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

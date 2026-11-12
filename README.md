@@ -43,3 +43,19 @@ Tests: `node tests/unit.test.js` (no setup) and `node tests/integration_v3.mjs` 
 SQL: after 006 run **007_account_deletion_quickitems.sql**. Deleting an account is done by a server function (no service-role key in the browser). Entries the user made in households that continue are KEPT and shown as "Deleted user". An owner whose household still has other members must remove them or delete the household first; a sole owner's household is deleted with the account.
 Quick Purchase = a saved item + price + automatic icon (never a transaction). Tapping its card makes the purchase.
 Tests: `npm test` (unit + UI smoke, no setup) and `node tests/integration_v4.mjs` (needs your Supabase).
+
+## Version 5 (delete fix, deleted users, fast start, mobile layout)
+SQL: after 007 run **`008 delete fix deleted users.sql`** (safe: changes no rows, no RLS policy and no grant).
+Full order for a fresh project: `schema.sql`, `002_analytics.sql`, `003_wallets_offline.sql`, `004 fix withdraw.sql`, `005 integrity security.sql`, `006 funds members quickitems.sql`, `007 account deletion quickitems.sql`, `008 delete fix deleted users.sql`.
+(`004 fix withdraw.sql` was missing from the repository and has been reconstructed; a database that already has the original 004 does not need it.)
+
+- **Deleting never needs funds.** The "Insufficient funds" rule applies to new spending/transfers and to edits that take money out, not to removing a record. If you delete an income or top-up whose money was already spent, the wallet shows a negative balance (the app warns first) and cannot be spent from until it is topped up.
+- **Sync errors name the operation**: "Expense sync failed (Shoes · EGP 50.00): …", "Delete sync failed …", "Edit sync failed …".
+- **Deleted user / Former member**: entries of a deleted account stay and show "Deleted user"; entries of a member who was removed show "Former member". Only the household owner can edit or delete them (unchanged rule).
+- **Startup**: the last dashboard is shown from the device at once; the session and fresh data are checked in the background (status pill: "Updating…"). Offline or with the server down the saved data and the offline queue keep working; only a session the server rejects returns to the login screen.
+- `supabase.min.js` (supabase-js 2.45.4) is now served from the app itself and precached for offline; the CDNs are only a fallback. **Upload it together with the other files.**
+
+Tests (`npm i` once): `npm test` runs
+- `tests/unit.test.js` – accounting rules, offline queue, sync and error attribution;
+- `tests/db.test.mjs` – the SQL files above on a real PostgreSQL (embedded binary), as the `authenticated` role with RLS: funds, concurrent spending, deletes, account deletion, permissions;
+- `tests/ui.test.mjs` – the real app in headless Chromium against a fake backend: startup (cached / slow / offline / expired / server down), deletes, offline queue, layout on iPhone / Android / iPad, safe areas, Arabic RTL, service worker.
