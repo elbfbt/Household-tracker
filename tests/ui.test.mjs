@@ -385,12 +385,30 @@ await test('offline entry: nothing is sent while it only exists on the phone; af
   await p.net(true);await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(()=>(JSON.parse(localStorage.getItem('mock_db')).pushes||[]).length===1);
   await p.page.evaluate(()=>localStorage.removeItem('__offline'));await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.status(/Online/);await sleep(400);
   const d=await p.db();eq([d.transactions.length,d.pushes.length,d.outbox.filter(o=>o.status==='pending').length],[n0+1,1,0]);noErr(p);await p.close()});
-await test('entry rejected by the server: no notification; notify function failing: the entry stays saved and no error is shown',async()=>{
+await test('entry rejected by the server: no notification; notify function failing: the entry stays saved and the REASON is shown once (not silent)',async()=>{
   const p=await open({uid:M,cfg:{pushFail:true}});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);const n0=(await p.db()).transactions.length;
+  await p.wait(()=>window.HTNotifyLast&&window.HTNotifyLast.ok===false,null,9000);                     // the once-per-launch call failed
+  await p.wait(()=>/Notifications were not sent: server error \(HTTP 500: claim failed - push_claim: 404\)/.test(document.querySelector('#toast')?.textContent||''));
+  eq(await p.page.evaluate(()=>window.HTNotifyLast),{ok:false,status:500,message:'claim failed - push_claim: 404'});
+  await p.page.evaluate(()=>{document.querySelector('#toast').className=''});
   await addExpense(p,99999,'Too much',WP);await p.wait(()=>/Insufficient funds/.test(document.querySelector('#toast')?.textContent||''));eq([((await p.db()).outbox||[]).length,(await p.db()).transactions.length],[0,n0],'nothing queued for a rejected entry:');
-  await sleep(4800);const c1=await fnCalls(p);await addExpense(p,5,'Gum');await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(c=>window.__calls.filter(x=>x.name==='fn notify-transactions').length>c,c1);await sleep(300);
-  eq(await p.toast(),'','no error toast for a notification problem:');eq(((await p.db()).pushes||[]).length,0);ok((await p.text('#tl')).includes('Gum'));
+  const c1=await fnCalls(p);await addExpense(p,5,'Gum');await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(c=>window.__calls.filter(x=>x.name==='fn notify-transactions').length>c,c1);await sleep(300);
+  ok(!/Notifications were not sent/.test(await p.toast()),'the problem is reported once per launch, not after every entry');eq(((await p.db()).pushes||[]).length,0);ok((await p.text('#tl')).includes('Gum'));
   eq(p.errors.filter(e=>!/notifications:/.test(e)),[]);await p.close()});
+for(const [mode,re,last] of [['404',/Notifications were not sent: the server function "notify-transactions" was not found \(HTTP 404: Requested function was not found\)/,{ok:false,status:404,message:'Requested function was not found'}],
+    ['401',/Notifications were not sent: the server refused the login token \(HTTP 401: Invalid JWT\)/,{ok:false,status:401,message:'Invalid JWT'}],
+    ['nokey',/Notifications were not sent: the server key ONESIGNAL_REST_API_KEY is missing$/,{ok:true,status:200,configured:false,claimed:0,sent:0,failed:0}]])
+  await test('notify function answer "'+mode+'" is reported with its exact reason; the pending notification stays queued',async()=>{
+    const p=await open({uid:M,cfg:{pushFail:mode}});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);
+    await p.wait(()=>!!window.HTNotifyLast,null,9000);await p.wait(()=>/Notifications were not sent/.test(document.querySelector('#toast')?.textContent||''));
+    const t=await p.toast();ok(re.test(t),'toast: '+t);eq(await p.page.evaluate(()=>window.HTNotifyLast),last);
+    const n0=(await p.db()).transactions.length,c1=await fnCalls(p);await addExpense(p,5,'Gum');await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(c=>window.__calls.filter(x=>x.name==='fn notify-transactions').length>c,c1);await sleep(200);
+    const d=await p.db();eq([(d.pushes||[]).length,d.outbox.filter(o=>o.status==='pending').length],[0,1],'saved, queued, not lost:');eq(p.errors.filter(e=>!/notifications:/.test(e)),[]);await p.close()});
+await test('notify function working: nothing is shown, result is recorded; a connection problem is only logged',async()=>{
+  const p=await open({uid:M});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);
+  await p.wait(()=>!!window.HTNotifyLast,null,9000);await sleep(200);eq(await p.page.evaluate(()=>[window.HTNotifyLast.ok,window.HTNotifyLast.status]),[true,200]);eq(await p.toast(),'');
+  eq(await p.page.evaluate(async()=>{const f=sb.functions.invoke;sb.functions.invoke=async()=>({data:null,error:{name:'FunctionsFetchError',message:'Failed to send a request to the Edge Function',context:new TypeError('Load failed')}});const r=await pokeNotify();sb.functions.invoke=f;return r}),{ok:false,status:0,message:'Failed to send a request to the Edge Function'});
+  eq(await p.toast(),'');await p.close()});
 await test('creator closed the app before the notification went out: it stays queued and is delivered when another member opens the app (once)',async()=>{
   const p=await open({uid:M});await subscribed(p);await withSdk(p);
   await p.page.evaluateOnNewDocument(()=>{if(localStorage.getItem('__q1'))return;localStorage.setItem('__q1','1');const d=JSON.parse(localStorage.getItem('mock_db'));const t=d.transactions.find(x=>x.category==='Vegetables');   // Omar's entry from days ago, never announced
@@ -419,10 +437,10 @@ console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v11'))return false;const c=await caches.open('ht-v11');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v12'))return false;const c=await caches.open('ht-v12');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
-  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v11');await new Promise(r=>setTimeout(r,200));
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v12');await new Promise(r=>setTimeout(r,200));
     return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
       cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
   eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');

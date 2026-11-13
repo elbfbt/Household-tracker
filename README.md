@@ -137,3 +137,19 @@ same function with a server credential. Not included in this stage.
 
 **Tests:** `npm test` → unit 23, database 32, notifications 27 (real Postgres + the real function code + a
 stand-in OneSignal), UI 45.
+
+### Notifications stay `pending` (attempts 0) — how to find the reason
+
+The app calls the Edge Function `notify-transactions` after every saved entry and once at every app start. Since
+this version the answer is never swallowed: a setup problem is shown once per app start
+("Notifications were not sent: …") and the full answer is kept in `window.HTNotifyLast`.
+
+| Message | Meaning | Fix |
+|---|---|---|
+| the server function "notify-transactions" was not found (HTTP 404) | not deployed, or deployed under another name | deploy it with exactly this name |
+| the server refused the login token (HTTP 401 …Invalid JWT / …Missing authorization header) | the gateway's "Verify JWT" check rejects the user token | switch "Verify JWT with legacy secret" OFF for this function (it verifies the user itself) |
+| the server refused the login token (HTTP 401: not signed in) | the function could not confirm the user with Supabase Auth | log out and in again |
+| the server key ONESIGNAL_REST_API_KEY is missing | secret absent or named differently | add the secret with exactly this name |
+| server error (HTTP 500: claim failed - …) | the database function `push_claim` could not be called; the text after the dash is the database's reason | run the current `010 transaction notifications.sql` |
+
+Rows that are still `pending` are delivered by the first successful call - no manual step.
