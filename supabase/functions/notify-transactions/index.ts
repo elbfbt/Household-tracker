@@ -84,15 +84,37 @@ export async function handle(req, env, fetchFn = fetch) {
   const base = String(env.SUPABASE_URL || '').replace(/\/+$/, ''), service = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !service) return reply(500, { error: 'function is not configured' });
 
-  // 1. who is calling? Ask Supabase Auth - never trust anything in the request body.
-  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-  if (!token) return reply(401, { error: 'not signed in' });
-  let uid = null;
-  try {
-    const r = await fetchFn(`${base}/auth/v1/user`, { headers: { Authorization: `Bearer ${token}`, apikey: env.SUPABASE_ANON_KEY || service } });
-    if (r.ok) uid = (await r.json()).id || null;
-  } catch (_e) { return reply(503, { error: 'auth unavailable' }); }
-  if (!uid) return reply(401, { error: 'not signed in' });
+  // 1. who is calling? Ask Supabase Auth - never trust anything in the request body, and never trust the token
+  //    without Supabase Auth confirming it (signature, expiry, session not revoked, user still exists).
+  //    Every refusal says WHERE it was refused ("stage") so a 401 can be told apart from the platform gateway's own
+  //    401 ({"code":401,"message":"Invalid JWT"}), which is produced before this code runs.
+  const token = (req.headers.get('Authorization') || '').replace(/^Bearer(\s+|$)/i, '').trim();
+  if (!token) return reply(401, { error: 'not signed in', stage: 'function:no-token', detail: 'the request carried no Authorization bearer token' });
+  // The Auth API sits behind the project's API gateway, which wants a valid project API key next to the user token.
+  // The key the browser itself used (public, proven to work - the app talks to the database with it) is tried
+  // first, then the keys Supabase injects into the function. The API key only opens the gateway: who the user is
+  // is decided by Supabase Auth from the user's token alone, so a made-up key gains nothing.
+  const apiKeys = [...new Set([req.headers.get('apikey'), env.SUPABASE_ANON_KEY, env.SUPABASE_PUBLISHABLE_KEY, service].map((k) => String(k || '').trim()).filter(Boolean))];
+  let uid = null, unavailable = '', refused = '';
+  for (const apikey of apiKeys) {
+    let r;
+    try { r = await fetchFn(`${base}/auth/v1/user`, { headers: { Authorization: `Bearer ${token}`, apikey } }); }
+    catch (e) { unavailable = clip(e && e.message || e, 120); continue; }
+    let j = {}; try { j = await r.json(); } catch (_e) { /* not JSON */ }
+    if (r.ok && j && j.id) { uid = j.id; break; }
+    const why = `auth HTTP ${r.status} ${clip(j && (j.msg || j.message || j.error_description || j.error_code || j.error) || '', 120)}`.trim();
+    if (r.status === 429 || r.status >= 500) unavailable = why; else refused = why;
+  }
+  if (!uid && unavailable && !refused) return reply(503, { error: 'auth unavailable', stage: 'function:auth-unavailable', detail: unavailable });
+  if (!uid) {
+    // Unverified peek at the token, ONLY to word the refusal (it grants nothing).
+    let hint = '';
+    try { const c = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (c.role && c.role !== 'authenticated') hint = ` (the token is the project "${c.role}" API key, not a user session)`;
+      else if (c.exp && c.exp * 1000 < Date.now()) hint = ' (the session token has expired)'; } catch (_e) { hint = ' (the token is not a JWT)'; }
+    console.error('notify-transactions: caller refused -', refused + hint);
+    return reply(401, { error: 'not signed in', stage: 'function:auth-rejected', detail: refused + hint });
+  }
 
   // Without the OneSignal key nothing is claimed: notifications stay queued until the key is configured.
   const key = env.ONESIGNAL_REST_API_KEY;

@@ -106,7 +106,10 @@ notification. The person who made the entry is not notified about their own entr
 1. SQL editor: run `010 transaction notifications.sql` (after 009).
 2. Edge Functions: deploy `supabase/functions/notify-transactions/index.ts` under the name `notify-transactions`
    (dashboard editor: create function → paste the file; or `supabase functions deploy notify-transactions`).
-   Keep "Verify JWT" on.
+   Switch "Verify JWT with legacy secret" OFF for this function (`supabase/config.toml` does that for CLI
+   deploys). The function is still not public: it confirms the caller's session with Supabase Auth and answers
+   401 otherwise. A 401 whose text is `Invalid JWT` comes from the gateway (setting still on); a 401 whose text
+   starts with `not signed in - …` comes from the function and names the reason.
 3. Edge Functions → Secrets: add `ONESIGNAL_REST_API_KEY` (OneSignal → Settings → Keys & IDs → REST API key).
    Optional secret: `APP_URL` (page opened when a notification is tapped).
 
