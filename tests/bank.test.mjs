@@ -477,7 +477,7 @@ try{
       ['expense',30,'Personal cash','Vodafone Cash mobile recharge','Bank SMS · Vodafone Cash',true,true]]);
     const b1=await bal(Ahmed,A);eq([b1['Bank account'],b1['Personal cash'],b1['Household cash']],[b0['Bank account']-1+205-200,b0['Personal cash']+1-30,b0['Household cash']]);eq(await count(A),n+5);
     eq(sent.length,5);ok(sent.every(x=>JSON.stringify(x.include_subscription_ids)===JSON.stringify([sub(3)])),'each one notified the other member only');
-    const dump=JSON.stringify([await imports(A),await txs(A)]);ok(!dump.includes('01095872700'),'the phone number is stored nowhere');ok(!dump.includes('المتاح')&&!dump.includes('كاش باك')&&!dump.includes('19623'),'the SMS text is stored nowhere')});
+    const dump=JSON.stringify([(await imports(A)).map(i=>[i.provider,i.kind,i.rule,i.reference]),(await txs(A)).map(t=>[t.type,t.amount,t.category,t.note])]);   /* stored text only: timestamps / ids contain digit runs by chance */ok(!dump.includes('01095872700'),'the phone number is stored nowhere');ok(!dump.includes('المتاح')&&!dump.includes('كاش باك')&&!dump.includes('19623'),'the SMS text is stored nowhere')});
   await test('resending each real message (once, ten times, with different spacing / digit style) → already_imported, still one transaction each, no new notification',async()=>{
     const n=await count(A);sent.length=0;
     for(const id of ['real_instapay_out','real_instapay_in','real_debit_card','real_vfcash_in','real_vfcash_recharge']){const m=R[id],k=m.issuer==='nbe'?kA:kVF;
@@ -510,7 +510,7 @@ try{
       const d=m.expect.type==='income'?m.expect.amount:-m.expect.amount;if(m.issuer==='nbe')bank+=d;else vf+=d}
     const b1=await bal(Ahmed,A),r2=x=>Math.round(x*100)/100;eq([r2(b1['Bank account']-b0['Bank account']),r2(b1['Personal cash']-b0['Personal cash']),b1['Household cash']],[r2(bank),r2(vf),b0['Household cash']]);eq([r2(bank),r2(vf)],[-1194,-131.2]);
     eq([await count(A),(await imports(A)).length,sent.length],[n+10,ni+10,10],'ten transactions, ten notifications - the 0 fee created nothing');
-    const dump=JSON.stringify([await imports(A),await txs(A)]);for(const x of ['01064773881','01095872700','مصاريف','كاش باك','المتاح','19623','23.35','3.93'])ok(!dump.includes(x),'"'+x+'" must not be stored');
+    const dump=JSON.stringify([(await imports(A)).map(i=>[i.provider,i.kind,i.rule,i.reference]),(await txs(A)).map(t=>[t.type,t.amount,t.category,t.note])]);   /* stored text only: timestamps / ids contain digit runs by chance */for(const x of ['01064773881','01095872700','مصاريف','كاش باك','المتاح','19623','23.35','3.93'])ok(!dump.includes(x),'"'+x+'" must not be stored');
     const words=JSON.stringify((await txs(A)).slice(-10).map(t=>[t.category,t.note]));ok(!/2521|0170|01\d{9}/.test(words),'no card / account / phone number in any description')});
   await test('repeated copies of the new messages (once, ten at once, other spacing) → already_imported; nothing new, no notification',async()=>{
     const n=await count(A);sent.length=0;
