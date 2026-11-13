@@ -399,7 +399,7 @@ export async function handle(req, env, fetchFn = fetch, now = Date.now()) {
   if (st === 'wallet_required') return reply(409, { ok: false, status: 'wallet_required', reason: res.reason, provider: p.provider, type: p.type });
   if (st === 'rejected') return reply(409, { ok: false, status: 'rejected', reason: res.reason, detail: res.detail, provider: p.provider, type: p.type, amount: p.amount });
   if (st === 'already_imported') return reply(200, { ok: true, status: 'already_imported', transaction_id: res.transaction_id || null });
-  if (st === 'would_import') return reply(200, { ok: true, status: 'would_import', dry_run: true, ...parsed, wallet: res.wallet, to_wallet: res.to_wallet || null });
+  if (st === 'would_import') return reply(200, { ok: true, status: 'would_import', dry_run: true, ...parsed, wallet: res.wallet, to_wallet: res.to_wallet || null, balance_negative: res.balance_negative === true });
   if (st !== 'imported') { console.error('bank-sms-import: unexpected commit result'); return reply(500, { ok: false, status: 'error' }); }
 
   // 6. hand over to the EXISTING notification pipeline (the outbox row already exists - written by the trigger).
@@ -411,7 +411,7 @@ export async function handle(req, env, fetchFn = fetch, now = Date.now()) {
     clearTimeout(timer);
     if (r.ok) notification = 'triggered'; else console.error('bank-sms-import: notify-transactions answered HTTP ' + r.status);
   } catch (e) { console.error('bank-sms-import: notify-transactions not reached', clip(e && e.message || e, 120)); }
-  return reply(200, { ok: true, status: 'imported', transaction_id: res.transaction_id, ...parsed, wallet: res.wallet, to_wallet: res.to_wallet || null, notification });
+  return reply(200, { ok: true, status: 'imported', transaction_id: res.transaction_id, ...parsed, wallet: res.wallet, to_wallet: res.to_wallet || null, balance_negative: res.balance_negative === true, notification });
 }
 
 // Supabase / Deno entry point (absent when the file is imported by the Node tests)

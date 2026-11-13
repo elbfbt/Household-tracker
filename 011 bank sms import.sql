@@ -112,10 +112,20 @@ end $$;
 -- Wallets by type (the app's own model):  expense / income -> the key's account wallet
 --                                         withdraw -> account wallet -> cash wallet;  deposit -> cash wallet -> account wallet
 -- Result status: imported | already_imported | would_import | unauthorized | wallet_required | rejected
+--
+-- BALANCE RULE. The bank has already carried the transaction out, so an import is NOT refused because the app's
+-- wallet holds too little (the app's figure may simply be out of date). For an entry that takes money out of a
+-- wallet, this function switches the "Insufficient funds" check off for its ONE insert (app.bypass_balance, the
+-- switch tx_balance_check already has, transaction-local) and switches it off again straight afterwards. The wallet
+-- then shows the true, possibly negative, balance and the result carries balance_negative = true.
+-- Nothing else changes: the trigger, the constraints and RLS are untouched, and everything a user enters in the app
+-- is checked exactly as before (so a negative wallet cannot be spent from by hand until it is topped up).
+-- The same switch also makes tx_lock() skip its wallet row lock, so the lock is taken HERE, explicitly, in the same
+-- order (by id) - imports and manual entries on one wallet are still strictly one after the other.
 create or replace function bank_import_commit(kh text, p jsonb, dry boolean default false) returns json
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare k bank_import_keys; a json; t text:=p->>'type'; amt numeric; at_ timestamptz; w1 uuid; w2 uuid; imp uuid; tx uuid; ex bank_imports;
-        fp text:=p->>'fingerprint'; msg text;
+        fp text:=p->>'fingerprint'; msg text; neg boolean:=false;
 begin
  a:=bank_import_auth(kh);
  if not (a->>'ok')::boolean then return json_build_object('status','unauthorized','reason',a->>'reason'); end if;
@@ -136,7 +146,8 @@ begin
  select * into ex from bank_imports where household_id=k.household_id and fingerprint=fp;
  if found then return json_build_object('status','already_imported','transaction_id',ex.transaction_id); end if;
  if dry then return json_build_object('status','would_import','user_id',k.user_id,
-   'wallet',(select name from wallets where id=w1),'to_wallet',(select name from wallets where id=w2)); end if;
+   'wallet',(select name from wallets where id=w1),'to_wallet',(select name from wallets where id=w2),
+   'balance_negative',(t<>'income' and wallet_bal(w1)-amt<0)); end if;
  -- the unique index decides races: of two simultaneous identical requests exactly one inserts
  insert into bank_imports(household_id,user_id,key_id,fingerprint,provider,kind,rule,reference,sms_hash)
   values(k.household_id,k.user_id,k.id,fp,left(coalesce(p->>'provider',''),40),left(coalesce(p->>'kind',''),40),left(coalesce(p->>'rule',''),60),
@@ -145,21 +156,28 @@ begin
  if imp is null then
   select * into ex from bank_imports where household_id=k.household_id and fingerprint=fp;
   return json_build_object('status','already_imported','transaction_id',ex.transaction_id); end if;
+ -- the wallet lock tx_lock() would take (same rows, same order); held until this request's transaction ends
+ perform 1 from wallets where household_id=k.household_id and id=any(array[w1,w2]) order by id for update;
  begin
+  -- w1 is the wallet the money leaves (expense, withdraw, deposit). An income only adds money: no bypass needed.
+  if t<>'income' then perform set_config('app.bypass_balance','on',true); end if;
   insert into transactions(household_id,user_id,wallet_id,to_wallet_id,type,amount,category,note,created_at)
    values(k.household_id,k.user_id,w1,w2,t,amt,left(coalesce(p->>'category',''),80),left(coalesce(p->>'note',''),200),at_)
    returning id into tx;
+  perform set_config('app.bypass_balance','off',true);           -- off again immediately after the one insert
   update bank_imports set transaction_id=tx where id=imp;
+  if t<>'income' then neg:=wallet_bal(w1)<0; end if;
  exception when others then
-  -- the entry was refused by the app's own rules (e.g. "Insufficient funds"): the sub-transaction is rolled back,
+  -- the entry was refused by another of the app's rules: the sub-transaction is rolled back (the switch with it),
   -- the fingerprint row is removed again so the same message can be imported later, nothing is half-written
   get stacked diagnostics msg=message_text;
+  perform set_config('app.bypass_balance','off',true);
   delete from bank_imports where id=imp;
-  return json_build_object('status','rejected','reason',case when msg like 'Insufficient funds%' then 'insufficient_funds' else 'transaction_refused' end,'detail',left(msg,200));
+  return json_build_object('status','rejected','reason','transaction_refused','detail',left(msg,200));
  end;
  update bank_import_keys set last_used_at=now() where id=k.id;
  return json_build_object('status','imported','transaction_id',tx,'user_id',k.user_id,
-   'wallet',(select name from wallets where id=w1),'to_wallet',(select name from wallets where id=w2));
+   'wallet',(select name from wallets where id=w1),'to_wallet',(select name from wallets where id=w2),'balance_negative',neg);
 end $$;
 
 revoke execute on function bank_import_key_new(uuid,text,uuid,uuid,int),bank_import_auth(text),bank_import_commit(text,jsonb,boolean) from public,anon,authenticated;

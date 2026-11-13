@@ -194,6 +194,15 @@ select bank_import_key_new((select id from auth.users where email = 'YOUR-LOGIN-
   null, 365);
 ```
 
+### When the wallet holds too little
+
+The bank has already completed the transaction, so the import is recorded even if the app's wallet balance is too
+low (the app's figure may be out of date). The wallet then shows a negative balance and the answer contains
+`"balance_negative": true`. No balancing entry is invented - correct the wallet yourself by adding the missing
+income. Entries typed into the app keep the normal "Insufficient funds" rule, so a negative wallet cannot be spent
+from by hand until it is topped up; further bank imports are still recorded. Only the import function can do this,
+for its single entry; the database rule itself, the constraints and RLS are unchanged.
+
 ### What becomes what
 
 | Message | App transaction | Wallets |
@@ -259,5 +268,5 @@ Parser only, offline: `node --no-warnings tools/bank-sms-parse.mjs "BanK-AIAhly"
 | 401 | `unauthorized` | key missing, wrong, expired, revoked, or the user left the household |
 | 403 | `sender_not_allowed` / `sender_not_supported` | sender differs from the key's / no rules for this sender |
 | 409 | `wallet_required` | the key's bank or cash wallet no longer exists |
-| 409 | `rejected` | the app's own rules refused the entry (e.g. `insufficient_funds`); nothing was written |
+| 409 | `rejected` | another of the app's rules refused the entry (`transaction_refused`); nothing was written. A low wallet balance is **not** a reason - see below |
 | 422 | `unrecognized_sms` | not confidently parsed (`reason` says why); nothing was written |

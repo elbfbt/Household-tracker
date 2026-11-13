@@ -349,13 +349,52 @@ try{
     await throws(()=>as(Ahmed,"update transactions set type='income' where id=$1",[id]),/immutable/);
     eq((await as(Ahmed,'delete from transactions where id=$1 returning id',[id])).rows.length,1);
     eq((await admin.query('select action from audit_log where tx_id=$1 order by id',[id])).rows.map(x=>x.action),['UPDATE','DELETE'])});
-  await test('the app\'s balance rule applies: not enough money in the bank wallet → rejected (insufficient_funds), nothing written; later the same SMS imports',async()=>{
-    const n=await count(A),i=(await imports(A)).length,b=(await bal(Ahmed,A))['Bank account'];
-    const text='Your card ending 1234 was charged EGP 900,000.00 at CAR DEALER on '+YD.txt+' 11:00. Ref 9000001';
-    const r=await imp(kA,text);eq([r.http,r.ok,r.status,r.reason,r.amount],[409,false,'rejected','insufficient_funds',900000]);ok(/Insufficient funds\. Available balance in Bank account/.test(r.detail));
-    eq([await count(A),(await imports(A)).length,(await bal(Ahmed,A))['Bank account']],[n,i,b]);
-    await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'income',900000,'Add income','']);
-    eq((await imp(kA,text)).status,'imported');eq((await imp(kA,text)).status,'already_imported');eq(await count(A),n+2)});
+  const ipay=(ref,amount,dir='out')=>{const [dd,mm]=YD.txt.split('/');return dir==='out'?`تم تنفيذ تحويل لحظي من حسابكم رقم 0170 بمبلغ ${amount} جم إلى TEST R***** رقم مرجعي ${ref} يوم ${mm}-${dd} الساعة 10:00 للمزيد اتصل بـ 19623`:`تم إضافة تحويل لحظي لحسابكم رقم 0170 بمبلغ ${amount} جم من TEST SENDER رقم مرجعي ${ref} يوم ${mm}-${dd} الساعة 10:00 للمزيد اتصل بـ 19623`};
+  const BA=()=>bal(Ahmed,A).then(b=>b['Bank account']);
+  await test('balance: enough money in the wallet → imported, balance_negative false (also in the dry run)',async()=>{
+    await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'income',1000,'Add income','']);const b=await BA();ok(b>=1000);
+    const d=await imp(kA,ipay('810000000001','100.00'),{dry_run:true});eq([d.status,d.balance_negative],['would_import',false]);
+    const r=await imp(kA,ipay('810000000001','100.00'));eq([r.http,r.status,r.type,r.amount,r.balance_negative],[200,'imported','expense',100,false]);eq(await BA(),b-100)});
+  await test('balance: an imported expense larger than the wallet is NOT refused → imported, balance_negative true, the wallet shows the negative balance, no balancing entry is invented',async()=>{
+    const n=await count(A),i=(await imports(A)).length,b=await BA(),text=ipay('810000000002','900,000.00');
+    const d=await imp(kA,text,{dry_run:true});eq([d.status,d.balance_negative],['would_import',true]);eq([await count(A),await BA()],[n,b],'dry run writes nothing');
+    const r=await imp(kA,text);eq([r.http,r.ok,r.status,r.type,r.amount,r.wallet,r.balance_negative],[200,true,'imported','expense',900000,'Bank account',true]);
+    eq([await count(A),(await imports(A)).length,await BA()],[n+1,i+1,b-900000],'exactly one entry; nothing else created');ok(await BA()<0);
+    const t=(await txs(A)).pop();eq([t.id,t.type,t.amount,t.wallet],[r.transaction_id,'expense',900000,'Bank account']);eq((await outbox(t.id)).status,'sent','notified like any entry');
+    const r2=await imp(kA,ipay('810000000003','50.00'));eq([r2.status,r2.balance_negative],['imported',true],'a further bank transaction on the negative wallet is recorded too');eq(await BA(),b-900050)});
+  await test('balance: entries made by hand keep the normal rule - expense / transfer / raising an amount on the negative wallet are rejected; the switch does not leak to the user',async()=>{
+    const b=await BA(),n=await count(A);ok(b<0);
+    await throws(()=>as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'expense',1,'Manual','']),/Insufficient funds\. Available balance in Bank account/);
+    await throws(()=>as(Ahmed,INS,[A,Ahmed,WA['Bank account'],WA['Personal cash'],'transfer',1,'Move','']),/Insufficient funds/);
+    await throws(()=>as(Mona,INS,[A,Mona,WA['Bank account'],null,'expense',0.01,'Manual','']),/Insufficient funds/);
+    const mine=(await txs(A)).filter(t=>t.note.includes('810000000003')).pop();await throws(()=>as(Ahmed,'update transactions set amount=60 where id=$1',[mine.id]),/Insufficient funds/);
+    eq([await count(A),await BA()],[n,b]);
+    eq((await admin.query("select current_setting('app.bypass_balance',true) v")).rows[0].v||'','','the switch is transaction-local: no session keeps it');
+    await throws(()=>as(Ahmed,'select bank_import_commit($1,$2::jsonb,false)',['0'.repeat(64),'{}']),/permission denied/,'a signed-in user cannot call the import function');
+    const src=(await admin.query("select prosrc from pg_proc where proname='tx_balance_check'")).rows[0].prosrc;ok(/Insufficient funds/.test(src)&&/bal<0/.test(src),'the balance trigger itself is unchanged')});
+  await test('balance: incoming transactions work normally on a negative wallet (balance_negative false) and bring it back; manual spending works again once positive',async()=>{
+    const b=await BA();const r=await imp(kA,ipay('810000000004','500.00','in'));eq([r.status,r.type,r.amount,r.balance_negative],['imported','income',500,false]);eq(await BA(),b+500);
+    await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'income',900050,'Add income','']);ok(await BA()>0);
+    eq((await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'expense',1,'Manual',''])).rows.length,1);await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'income',1,'Add income',''])});
+  await test('balance: duplicate protection still works after a negative-balance import (resend x1, x10, dry run) → already_imported, balance unchanged',async()=>{
+    const n=await count(A),b=await BA();
+    for(const ref of ['810000000001','810000000002','810000000003']){const amt=ref.endsWith('1')?'100.00':ref.endsWith('2')?'900,000.00':'50.00';
+      eq((await imp(kA,ipay(ref,amt))).status,'already_imported',ref);eq((await Promise.all(Array.from({length:10},()=>imp(kA,ipay(ref,amt))))).map(x=>x.status),Array(10).fill('already_imported'));eq((await imp(kA,ipay(ref,amt),{dry_run:true})).status,'already_imported')}
+    eq([await count(A),await BA()],[n,b])});
+  await test('balance: concurrent imports cannot race - 12 different imports at once plus manual spending: every import is recorded once, the balance is exact, manual entries never overdraw',async()=>{
+    const b0=await BA(),n=await count(A);await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'expense',b0-300,'Reset','']);eq(await BA(),300);
+    const jobs=[];for(let i=0;i<12;i++)jobs.push(imp(kA,ipay('82000000'+String(1000+i),'70.00')).then(r=>['imp',r.status,r.balance_negative]));
+    for(let i=0;i<8;i++)jobs.push(db.conn().then(c=>db.as(i%2?Mona:Ahmed,INS,[A,i%2?Mona:Ahmed,WA['Bank account'],null,'expense',70,'Manual race',''],c).finally(()=>c.end())).then(()=>['man','ok'],e=>['man',/Insufficient funds/.test(e.message)?'refused':'ERR '+e.message]));
+    const res=await Promise.all(jobs),imps=res.filter(x=>x[0]==='imp'),man=res.filter(x=>x[0]==='man');
+    eq(imps.map(x=>x[1]),Array(12).fill('imported'));ok(man.every(x=>x[1]==='ok'||x[1]==='refused'),JSON.stringify(man));const okMan=man.filter(x=>x[1]==='ok').length;ok(okMan<=4,'manual entries can use at most the 300 that were there: '+okMan);
+    const after=await BA();eq(after,300-12*70-okMan*70,'balance = exactly the sum of what was recorded');eq(await count(A),n+1+12+okMan);
+    eq(imps.filter(x=>x[2]===true).length>=12-4,true,'imports that ended below zero say so');
+    const rows=(await txs(A)).filter(t=>/ref 82000000\d{4}/.test(t.note));eq([rows.length,new Set(rows.map(t=>t.note)).size],[12,12]);
+    await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'income',b0-after,'Add income','']);eq(await BA(),b0)});
+  await test('balance: the import really waits for the wallet lock (a manual entry holding the wallet blocks it; it completes after the release)',async()=>{
+    const c=await db.conn();await c.query('begin');await c.query('select 1 from wallets where id=$1 for update',[WA['Bank account']]);
+    let done=false;const job=imp(kA,ipay('830000000001','5.00')).then(r=>{done=true;return r});await new Promise(r=>setTimeout(r,400));eq(done,false,'still waiting while the wallet is locked');
+    await c.query('commit');await c.end();const r=await job;eq([r.status,done],['imported',true])});
   await test('wallet_required: no wallet is ever picked arbitrarily (cash wallet gone → ATM message refused; bank wallet gone → everything refused; no "Bank account" → no key)',async()=>{
     const n=await count(A),atm='Cash withdrawal of EGP 100.00 from ATM using card ending 1234 on '+YD.txt+' at 07:00';
     await admin.query('update bank_import_keys set cash_wallet_id=null where user_id=$1',[Mona]);
