@@ -173,13 +173,14 @@ Rows that are still `pending` are delivered by the first successful call - no ma
 | BanK-AIAhly | Debit card purchase - "تم خصم … من بطاقة الخصم المباشر … عند… يومDD/MM/YY الساعة… المتاح…" | `expense`, description = merchant |
 | Vodafone Cash | Money received - "تم استلام مبلغ … من 01… المسجل بإسم … رصيدك الحالي … رقم العملية …" | `income`, note "From <name>" (the phone number is not kept) |
 | Vodafone Cash | Mobile recharge - "تم شحن رصيد موبايلك ب … بنجاح وخصم … من محفظتك …" | `expense` "Vodafone Cash mobile recharge", amount = what left the wallet |
+| Vodafone Cash | Money sent - "تم تحويل … جنيه لرقم 01… مصاريف الخدمة 0 جنيه رصيد حسابك فى فودافون كاش الحالي … تاريخ العملية … رقم العملية …" | `expense` "Vodafone Cash transfer" (the recipient's phone number is not kept). Only a service fee of 0 has been verified: a message with another fee is refused (`fee_not_verified`) |
 
 Each of these rules describes the whole structure of its message; amount, balance, phone number, reference and
 advert each have a fixed place. A message whose wording differs is answered `unrecognized_sms`
 (`structure_mismatch`) and nothing is created.
 
 Everything else in the rule list (ATM withdrawal, cash deposit, account credit, plain bank transfer, refund,
-reversal, Vodafone Cash sent, all English wording) is **provisional**: written without a real message, and
+reversal, all English wording) is **provisional**: written without a real message, and
 therefore switched off in the deployed function. Such a message is answered `unrecognized_sms` until a real example
 is supplied and its rule verified. (`BANK_SMS_PROVISIONAL_RULES=on` exists for the tests only - never set it.)
 

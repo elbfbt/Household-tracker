@@ -28,7 +28,7 @@ await test('bank transfer sent → expense with the recipient; reference kept',(
   eq(describe(a),{category:'MOHAMED ALI',note:'Transfer · Bank SMS · Bank · ref FT26317ABC'})});
 await test('InstaPay sent / received (English + Arabic) → expense / income, provider "instapay"',()=>{for(const k of ['instapay_out_en','instapay_in_en'])eq(fx(k).provider,'instapay');
   eq(describe(P(M.instapay_in_en.text)),{category:'Add income',note:'From SARA HASSAN · Bank SMS · InstaPay · ref 555666777'})});
-await test('Vodafone Cash received / sent (English + Arabic) → income / expense, provider "vodafone_cash"',()=>{for(const k of ['vfcash_in_en','vfcash_out_en','vfcash_out_ar'])eq(fx(k).provider,'vodafone_cash')});
+await test('Vodafone Cash received / sent (English + Arabic) → income / expense, provider "vodafone_cash"',()=>{for(const k of ['vfcash_in_en','vfcash_out_en'])eq(fx(k).provider,'vodafone_cash')});
 await test('refund and reversal (English + Arabic) → income marked as refund / reversal',()=>{fx('refund_en');fx('refund_ar');fx('reversal_en');fx('reversal_ar');
   eq(describe(P(M.refund_en.text)),{category:'Add income',note:'Refund · AMAZON EG · Bank SMS · Card'});eq(describe(P(M.reversal_ar.text)).note,'Reversal · NOON · Bank SMS · Card')});
 await test('every rule is exercised by a fixture, and only existing app transaction types are produced',()=>{
@@ -80,7 +80,7 @@ await test('Arabic text is matched regardless of hamza / diacritics / tatweel / 
   eq(foldSms('إلى الآلي ABC').length,'إلى الآلي ABC'.length);eq(cleanSms('  a \n\t b  '),'a b')});
 await test('providers are not confused: InstaPay ≠ Vodafone Cash ≠ plain bank transfer; a currency or a keyword alone decides nothing',()=>{
   for(const k of ['instapay_out_en','instapay_in_en'])eq(P(M[k].text,'vodafone_cash').reason,'no_rule_matched',k+' with a Vodafone Cash key');
-  for(const k of ['vfcash_in_en','vfcash_out_en','vfcash_out_ar'])eq(P(M[k].text,'nbe').reason,'no_rule_matched',k+' with a bank key');
+  for(const k of ['vfcash_in_en','vfcash_out_en'])eq(P(M[k].text,'nbe').reason,'no_rule_matched',k+' with a bank key');
   eq([P(M.transfer_en.text).provider,P(M.transfer_ar.text).provider],['bank','bank'],'a transfer without InstaPay wording is never "instapay"');
   eq(P(M.transfer_en.text.replace('A transfer','An InstaPay transfer')).provider,'instapay');
   eq(P('InstaPay: you received EGP 300.00 in your Vodafone Cash wallet from SARA','nbe').ok,false,'InstaPay + Vodafone Cash wording together → nobody claims it');
@@ -117,7 +117,7 @@ await test('REAL Vodafone Cash mobile recharge → expense 30 (the amount after 
   eq(PR(R.real_vfcash_recharge.text.replace('وخصم 30','وخصم 31.5'),'vodafone_cash').amount,31.5,'the amount is what left the wallet')});
 await test('the five real messages give the same result with or without issuer filter and with the provisional rules on; each is claimed by exactly one rule',()=>{
   for(const m of FX.real_messages)for(const o of [{},{provisional:true},{issuer:m.issuer,provisional:true}])eq(parseSms(m.text,{now:RNOW,...o}),{ok:true,...m.expect},m.id+JSON.stringify(o));
-  eq(VERIFIED_RULES.map(r=>r.id),['nbe.instapay_out.ar','nbe.instapay_in.ar','nbe.debit_card_purchase.ar','vfc.received.ar','vfc.mobile_recharge.ar']);ok(VERIFIED_RULES.every(r=>r.shape&&!r.provisional)&&PROVISIONAL_RULES.every(r=>r.provisional&&!r.shape));
+  eq(VERIFIED_RULES.map(r=>r.id),['nbe.instapay_out.ar','nbe.instapay_in.ar','nbe.debit_card_purchase.ar','vfc.received.ar','vfc.mobile_recharge.ar','vfc.sent.ar']);ok(VERIFIED_RULES.every(r=>r.shape&&!r.provisional)&&PROVISIONAL_RULES.every(r=>r.provisional&&!r.shape));
   for(const m of FX.real_messages)eq(PR(m.text,m.issuer==='nbe'?'vodafone_cash':'nbe').reason,'no_rule_matched',m.id+' with the other provider\'s key')});
 await test('NEGATIVE balance: the available / current balance is never the amount - if the transaction amount is missing nothing is recognised',()=>{
   const c=R.real_debit_card.text,v=R.real_vfcash_in.text,g=R.real_vfcash_recharge.text;
@@ -158,6 +158,52 @@ await test('real formats: amounts with separators / decimals, Arabic-Indic digit
   nor(c.replace('12/11/26','32/11/26'),'date_malformed','nbe');nor(c.replace('12/11/26','12/11/27'),'date_in_future','nbe');nor(v.replace('26-11-12','26-13-12'),'date_malformed','vodafone_cash');nor(v.replace('26-11-12','25-11-12'),'date_too_old','vodafone_cash');
   eq(PR(o.replace('يوم 11-12 الساعة 17:24','يوم 12-31 الساعة 23:50'),'nbe',Date.parse('2027-01-01T06:00:00Z')).at,'2026-12-31T21:50:00.000Z','31 December read on 1 January');
   eq(PR(o.replace('يوم 11-12','يوم 11-05'),'nbe').at,'2026-11-05T15:24:00.000Z','MONTH-DAY, not day-month')});
+
+console.log('\nBank SMS parser - VERIFIED rules, second batch of real production messages');
+const R2=FX.real_messages.filter(m=>m.id.startsWith('real2_'));
+await test('all ten new real messages parse exactly as specified (type, amount, provider, name, reference, time, description)',()=>{eq(R2.length,10);for(const m of R2)rx(m.id);
+  eq(R2.map(m=>[m.expect.type,m.expect.amount]),[['expense',105],['income',8.8],['expense',5],['expense',30],['income',9],['expense',1],['expense',182],['expense',20],['expense',200],['expense',800]])});
+await test('REAL Vodafone Cash outgoing transfer → expense 105, reference 024986273684, 22 Oct 16:54, described "Vodafone Cash transfer"; the recipient phone number is not kept',()=>{
+  const p=rx('real2_vfcash_out');eq([p.type,p.amount,p.provider,p.kind,p.party,p.reference,p.at],['expense',105,'vodafone_cash','transfer_out','','024986273684','2026-10-22T13:54:00.000Z']);
+  eq(describe(p),{category:'Vodafone Cash transfer',note:'Transfer · Bank SMS · Vodafone Cash · ref 024986273684'});ok(!JSON.stringify([p,describe(p)]).includes('01064773881'))});
+await test('Vodafone Cash outgoing transfer is not confused with mobile recharge (and the reverse); a mixture of both is refused',()=>{
+  const o=R.real2_vfcash_out.text,g=R.real2_vfcash_recharge_30.text;eq([PR(o,'vodafone_cash').rule,PR(o,'vodafone_cash').kind],['vfc.sent.ar','transfer_out']);eq([PR(g,'vodafone_cash').rule,PR(g,'vodafone_cash').kind],['vfc.mobile_recharge.ar','mobile_recharge']);
+  eq(describe(PR(o,'vodafone_cash')).category,'Vodafone Cash transfer');eq(describe(PR(g,'vodafone_cash')).category,'Vodafone Cash mobile recharge');
+  nor(o+' '+g,'no_rule_matched','vodafone_cash');nor(g+' '+o,'no_rule_matched','vodafone_cash');nor(o.replace('تم تحويل 105 جنيه لرقم 01064773881','تم شحن رصيد موبايلك ب 105 بنجاح'),'no_rule_matched','vodafone_cash');
+  nor(o+' '+R.real2_vfcash_in_en_name.text,'no_rule_matched','vodafone_cash');nor(R.real2_vfcash_in_en_name.text+' '+o,'no_rule_matched','vodafone_cash')});
+await test('"مصاريف الخدمة 0 جنيه" is never the amount and never a transaction; a fee other than 0 has not been verified → refused, nothing guessed',()=>{
+  const o=R.real2_vfcash_out.text;eq(PR(o,'vodafone_cash').amount,105);
+  nor(o.replace('تم تحويل 105 جنيه لرقم','تم تحويل لرقم'),'structure_mismatch','vodafone_cash');nor(o.replace('105 جنيه ',''),'structure_mismatch','vodafone_cash');
+  nor('مصاريف الخدمة 0 جنيه رصيد حسابك فى فودافون كاش الحالي 3.93. رقم العملية 024986273684','no_rule_matched','vodafone_cash');
+  nor(o.replace('مصاريف الخدمة 0 جنيه','مصاريف الخدمة 1 جنيه'),'fee_not_verified','vodafone_cash');nor(o.replace('مصاريف الخدمة 0 جنيه','مصاريف الخدمة 0.50 جنيه'),'fee_not_verified','vodafone_cash');
+  eq(PR(o.replace('مصاريف الخدمة 0 جنيه','مصاريف الخدمة 0.00 جنيه'),'vodafone_cash').amount,105);nor(o.replace('مصاريف الخدمة 0 جنيه ',''),'no_rule_matched','vodafone_cash')});
+await test('phone numbers are never the description and never the amount (outgoing: recipient number; incoming: sender + own wallet number)',()=>{
+  for(const id of ['real2_vfcash_out','real2_vfcash_in_en_name','real_vfcash_in']){const p=PR(R[id].text,'vodafone_cash'),all=JSON.stringify([p,describe(p)]);ok(!/01\d{9}/.test(all),id+': no phone number anywhere in the result');ok(p.amount<1000)}
+  const o=R.real2_vfcash_out.text;nor(o.replace('105 جنيه لرقم 01064773881','01064773881 جنيه لرقم 105'),'structure_mismatch','vodafone_cash');nor(o.replace('لرقم 01064773881','لرقم 12345'),'structure_mismatch','vodafone_cash');
+  eq(PR(o.replace('01064773881','01000000009'),'vodafone_cash').amount,105)});
+await test('the Vodafone Cash current balance (3.93 / 8.93 / 0.13 / 8.13) is never the amount, whatever its value',()=>{
+  eq(['real2_vfcash_out','real2_vfcash_in_en_name','real2_vfcash_recharge_5','real2_vfcash_recharge_30'].map(id=>PR(R[id].text,'vodafone_cash').amount),[105,8.8,5,30]);
+  eq(PR(R.real2_vfcash_out.text.replace('3.93','7,500.25'),'vodafone_cash').amount,105);eq(PR(R.real2_vfcash_out.text.replace('3.93','0'),'vodafone_cash').amount,105);eq(PR(R.real2_vfcash_recharge_5.text.replace('0.13','999'),'vodafone_cash').amount,5);eq(PR(R.real2_vfcash_in_en_name.text.replace('8.93','4000'),'vodafone_cash').amount,8.8);
+  nor(R.real2_vfcash_recharge_5.text.replace('وخصم 5 من محفظتك','من محفظتك'),'structure_mismatch','vodafone_cash');nor(R.real2_vfcash_in_en_name.text.replace('مبلغ 8.80 جنيه','مبلغ'),'structure_mismatch','vodafone_cash')});
+await test('the advert\'s "100ج" is never the amount (transfer and both recharges), also when the advert changes or disappears',()=>{
+  for(const id of ['real2_vfcash_out','real2_vfcash_recharge_5','real2_vfcash_recharge_30']){const m=R[id],a=m.expect.amount;eq(PR(m.text.replace('100ج','9000ج'),'vodafone_cash').amount,a,id);eq(PR(m.text.replace(/ ?حول فلوس[^]*$/,''),'vodafone_cash').amount,a,id+' without advert');ok(a!==100)}
+  nor('حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. رقم العملية 024986273684 فودافون كاش','no_rule_matched','vodafone_cash')});
+await test('card ending (2521), available balance (23.35 / 3.35 / 8.35 / 11.31) and hotline (١٩٦٢٣) are never the amount; "الساعه" = "الساعة"; spacing variants',()=>{
+  const ids=['real2_card_wekalet_182','real2_card_wekalet_20','real2_card_market_200','real2_card_zainy_800'];eq(ids.map(id=>PR(R[id].text,'nbe').amount),[182,20,200,800]);
+  for(const id of ids){const t=R[id].text,a=R[id].expect.amount;nor(t.replace(/تم خصم \d+ EGP/,'تم خصم'),'structure_mismatch','nbe');eq(PR(t.replace('2521','9876'),'nbe').amount,a);eq(PR(t.replace(/المتاح ?[\d.]+EGP/,'المتاح 54,321.00 EGP'),'nbe').amount,a);
+    eq(PR(t.replace('١٩٦٢٣','٩٩٩٩٩'),'nbe'),PR(t,'nbe'));eq(PR(t.replace(/ للمزيد[^]*$/,''),'nbe'),PR(t,'nbe'));nor(t.replace(/رقم ?2521/,'رقم 25219'),'structure_mismatch','nbe');nor(t.replace(/ المتاح ?[\d.]+EGP/,''),'structure_mismatch','nbe')}
+  const w=R.real2_card_wekalet_182.text;eq(PR(w.replace('الساعه','الساعة'),'nbe'),PR(w,'nbe'));eq(PR(w.replace(/  /g,' '),'nbe'),PR(w,'nbe'));eq(PR(w.replace('رقم 2521  عند WEKALET','رقم2521 عندWEKALET').replace('يوم 09','يوم09').replace('الساعه 15','الساعه15').replace('المتاح 23','المتاح23'),'nbe'),PR(w,'nbe'));
+  nor('للمزيد اتصل ب ١٩٦٢٣','no_rule_matched','nbe');nor('بطاقة الخصم المباشر رقم 2521 المتاح 23.35EGP للمزيد إتصل ب ١٩٦٢٣','no_rule_matched','nbe')});
+await test('English sender / recipient names work and keep their spelling (InstaPay in, InstaPay out masked, Vodafone Cash in); Arabic names unchanged',()=>{
+  eq(['real2_instapay_in_en_name','real2_instapay_out_masked_en','real2_vfcash_in_en_name','real_instapay_in','real_vfcash_in'].map(id=>PR(R[id].text,R[id].issuer).party),['MOHAMED ELGHANDOUR','RAHMA K***** E*****','MOHAMED ELGHANDOUR','عبير على زين العابدين القصبى قداح','محمد اسامه احمد علي حسنين']);
+  eq(PR(R.real2_instapay_in_en_name.text.replace('MOHAMED ELGHANDOUR','Sara El-Sayed'),'nbe').party,'Sara El-Sayed');eq(PR(R.real2_vfcash_in_en_name.text.replace('MOHAMED ELGHANDOUR','Mona Ali 2'),'vodafone_cash').party,'Mona Ali 2')});
+await test('materially altered / ambiguous versions of the new messages → unrecognised',()=>{
+  const o=R.real2_vfcash_out.text,c=R.real2_card_wekalet_182.text,i=R.real2_instapay_in_en_name.text;
+  nor(o.replace('تم تحويل','لم يتم تحويل'),'declined_or_failed','vodafone_cash');nor(o.replace('تم تحويل','سيتم تحويل'),'structure_mismatch','vodafone_cash');nor(o.replace('تم تحويل','طلب تحويل'),'no_rule_matched','vodafone_cash');nor(o.replace('رقم العملية 024986273684 :','رقم العملية :'),'structure_mismatch','vodafone_cash');
+  nor(o.replace('26-10-22','26-13-22'),'date_malformed','vodafone_cash');nor(o.replace('26-10-22','25-10-22'),'date_too_old','vodafone_cash');nor(o.replace('105 جنيه','105 دولار'),'structure_mismatch','vodafone_cash');nor(o.replace('105 جنيه','1,05 جنيه'),'amount_malformed','vodafone_cash');
+  nor(o.replace('لرقم 01064773881','لرقم 01064773881 ولرقم 01000000001'),'structure_mismatch','vodafone_cash');nor(o,'no_rule_matched','nbe');
+  nor(c+' '+R.real2_card_wekalet_20.text.replace('تم خصم','وتم تحويل'),'no_rule_matched','nbe');nor(c.replace('عند WEKALET ELMANSOURA','')+'','no_rule_matched','nbe');nor(c.replace('يوم 09/11/26  الساعه 15:23',''),'structure_mismatch','nbe');
+  nor(c.replace('تم خصم','تم استرداد'),'no_rule_matched','nbe');nor(i.replace('رقم مرجعي 490012399928','بدون مرجع'),'structure_mismatch','nbe');nor(i+' '+R.real2_instapay_out_masked_en.text,'no_rule_matched','nbe')});
 
 /* ================================================= with the database ================================================= */
 console.log('\nBank SMS import (real PostgreSQL + real Edge Functions)');
@@ -413,6 +459,32 @@ try{
     eq((await postReal(kA,{...R.real_debit_card,text:R.real_debit_card.text.replace('تم خصم 200 EGP','تم خصم')})).reason,'structure_mismatch');
     eq((await postReal(kA,{...R.real_instapay_out,text:R.real_instapay_out.text+' '+R.real_instapay_in.text})).status,'unrecognized_sms');
     eq((await postReal(kVF,{...R.real_vfcash_recharge,text:'حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك'})).status,'unrecognized_sms');eq(await count(A),n)});
+
+  console.log('\nSecond batch of real messages through the deployed configuration');
+  await test('the ten new real messages become the right normal transactions; phone numbers, balances, fee, advert and hotline are stored nowhere',async()=>{
+    await as(Ahmed,INS,[A,Ahmed,WA['Personal cash'],null,'income',500,'Add income','']);await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'income',2000,'Add income','']);await admin.query("update notification_outbox set status='sent',done_at=now() where status<>'sent'");
+    const b0=await bal(Ahmed,A),n=await count(A),ni=(await imports(A)).length;sent.length=0;let bank=0,vf=0;
+    for(const m of R2){const r=await postReal(m.issuer==='nbe'?kA:kVF,m);eq([r.http,r.status,r.type,r.amount,r.notification],[200,'imported',m.expect.type,m.expect.amount,'triggered'],m.id);
+      const t=(await txs(A)).pop();eq([t.id,t.type,t.amount,t.wallet,t.category,t.note,t.user_id],[r.transaction_id,m.expect.type,m.expect.amount,m.issuer==='nbe'?'Bank account':'Personal cash',m.describe.category,m.describe.note,Ahmed],m.id);
+      if(m.expect.date_source==='sms')eq(t.created_at.toISOString(),m.expect.at,m.id+' time');
+      const i=(await imports(A)).pop();eq([i.transaction_id,i.provider,i.rule,i.reference],[t.id,m.expect.provider,m.expect.rule,m.expect.reference||null],m.id);
+      const d=m.expect.type==='income'?m.expect.amount:-m.expect.amount;if(m.issuer==='nbe')bank+=d;else vf+=d}
+    const b1=await bal(Ahmed,A),r2=x=>Math.round(x*100)/100;eq([r2(b1['Bank account']-b0['Bank account']),r2(b1['Personal cash']-b0['Personal cash']),b1['Household cash']],[r2(bank),r2(vf),b0['Household cash']]);eq([r2(bank),r2(vf)],[-1194,-131.2]);
+    eq([await count(A),(await imports(A)).length,sent.length],[n+10,ni+10,10],'ten transactions, ten notifications - the 0 fee created nothing');
+    const dump=JSON.stringify([await imports(A),await txs(A)]);for(const x of ['01064773881','01095872700','مصاريف','كاش باك','المتاح','19623','23.35','3.93'])ok(!dump.includes(x),'"'+x+'" must not be stored');
+    const words=JSON.stringify((await txs(A)).slice(-10).map(t=>[t.category,t.note]));ok(!/2521|0170|01\d{9}/.test(words),'no card / account / phone number in any description')});
+  await test('repeated copies of the new messages (once, ten at once, other spacing) → already_imported; nothing new, no notification',async()=>{
+    const n=await count(A);sent.length=0;
+    for(const m of R2){const k=m.issuer==='nbe'?kA:kVF;const f=await postReal(k,m);eq([f.http,f.ok,f.status],[200,true,'already_imported'],m.id);
+      eq((await Promise.all(Array.from({length:10},()=>postReal(k,m)))).map(x=>x.status),Array(10).fill('already_imported'),m.id+' x10');eq((await postReal(k,{...m,text:' '+m.text.replace(/ +/g,'   ')+'\n'})).status,'already_imported',m.id+' spacing')}
+    eq((await postReal(kVF,{...R.real2_vfcash_out,text:R.real2_vfcash_out.text.replace(/ ?حول فلوس[^]*$/,'')})).status,'already_imported','same operation number without the advert');
+    eq((await postReal(kA,{...R.real2_card_wekalet_182,text:R.real2_card_wekalet_182.text.replace('الساعه','الساعة')})).status,'imported','(a card SMS has no reference: a different spelling is a different text - documented limit)');
+    eq([await count(A),sent.length],[n+1,1])});
+  await test('two purchases at the same merchant on the same day (182 and 20) are two transactions; altered / fee-carrying messages create nothing',async()=>{
+    const t=(await txs(A)).filter(x=>x.category==='WEKALET ELMANSOURA').map(x=>x.amount).sort((a,b)=>a-b);eq(t,[20,182,182]);const n=await count(A);
+    eq(await postReal(kVF,{...R.real2_vfcash_out,text:R.real2_vfcash_out.text.replace('مصاريف الخدمة 0 جنيه','مصاريف الخدمة 1 جنيه').replace('024986273684','024986273999')}),{http:422,ok:false,status:'unrecognized_sms',reason:'fee_not_verified'});
+    eq((await postReal(kVF,{...R.real2_vfcash_out,text:R.real2_vfcash_out.text.replace('105 جنيه ','')})).status,'unrecognized_sms');eq((await postReal(kVF,{...R.real2_vfcash_out,text:R.real2_vfcash_out.text+' '+R.real2_vfcash_recharge_5.text})).status,'unrecognized_sms');
+    eq((await postReal(kA,{...R.real2_card_zainy_800,text:R.real2_card_zainy_800.text.replace('تم خصم 800 EGP','تم خصم')})).status,'unrecognized_sms');eq((await postReal(kA,{sender:'BanK-AIAhly',text:R.real2_vfcash_out.text})).status,'unrecognized_sms');eq(await count(A),n)});
 
   console.log('\nLogging and clean-up');
   await test('logs: outcome, rule, reason and hashed identifiers only - never the SMS text, a name, a key or the service key',async()=>{

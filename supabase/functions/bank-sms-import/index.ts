@@ -163,27 +163,35 @@ const EGPW = `(?:جم|جنيها?|ج\\.م\\.?|egp|l\\.?e\\.?)`;               //
 const PHONE = `01\\d{9}`;
 const shape = (src) => new RegExp(src, 'ud');
 export const VERIFIED_RULES = [
+  // (real messages write the hour word both as "الساعة" and "الساعه")
   // "تم تنفيذ تحويل لحظي من حسابكم رقم 0170 بمبلغ 1.00 جم إلى <name> رقم مرجعي <ref> يوم MM-DD الساعة HH:MM ..."
   { id: 'nbe.instapay_out.ar', issuer: 'nbe', provider: 'instapay', kind: 'transfer_out', type: 'expense', dateOrder: 'md',
     all: [A('تحويل لحظي'), A('تم تنفيذ'), A('من حسابكم')], none: [A('اضاف|استلام|خصم|بطاق')],
-    shape: shape(`^تم تنفيذ تحويل لحظي من حسابكم رقم ?\\d{2,8} بمبلغ ?(?<amount>${N}) ?${EGPW} الي (?<party>\\S.{0,78}?\\S) رقم مرجعي ?(?<ref>\\d{6,20}) يوم ?(?<mo>\\d{1,2})-(?<d>\\d{1,2}) الساعة ?(?<hh>\\d{1,2}):(?<mi>\\d{2})(?!\\d)`) },
+    shape: shape(`^تم تنفيذ تحويل لحظي من حسابكم رقم ?\\d{2,8} بمبلغ ?(?<amount>${N}) ?${EGPW} الي (?<party>\\S.{0,78}?\\S) رقم مرجعي ?(?<ref>\\d{6,20}) يوم ?(?<mo>\\d{1,2})-(?<d>\\d{1,2}) الساع[ةه] ?(?<hh>\\d{1,2}):(?<mi>\\d{2})(?!\\d)`) },
   // "تم إضافة تحويل لحظي لحسابكم رقم 0170 بمبلغ 205.00 جم من <name> رقم مرجعي <ref> يوم MM-DD الساعة HH:MM ..."
   { id: 'nbe.instapay_in.ar', issuer: 'nbe', provider: 'instapay', kind: 'transfer_in', type: 'income', dateOrder: 'md',
     all: [A('تحويل لحظي'), A('تم اضافة'), A('لحسابكم')], none: [A('تنفيذ|استلام|خصم|بطاق')],
-    shape: shape(`^تم اضافة تحويل لحظي لحسابكم رقم ?\\d{2,8} بمبلغ ?(?<amount>${N}) ?${EGPW} من (?<party>\\S.{0,78}?\\S) رقم مرجعي ?(?<ref>\\d{6,20}) يوم ?(?<mo>\\d{1,2})-(?<d>\\d{1,2}) الساعة ?(?<hh>\\d{1,2}):(?<mi>\\d{2})(?!\\d)`) },
+    shape: shape(`^تم اضافة تحويل لحظي لحسابكم رقم ?\\d{2,8} بمبلغ ?(?<amount>${N}) ?${EGPW} من (?<party>\\S.{0,78}?\\S) رقم مرجعي ?(?<ref>\\d{6,20}) يوم ?(?<mo>\\d{1,2})-(?<d>\\d{1,2}) الساع[ةه] ?(?<hh>\\d{1,2}):(?<mi>\\d{2})(?!\\d)`) },
   // "تم خصم 200 EGP من بطاقة الخصم المباشر رقم2521 عندMansoura Market 2 D يوم12/11/26 الساعة21:43 المتاح11.31EGP ..."
   { id: 'nbe.debit_card_purchase.ar', issuer: 'nbe', provider: 'debit_card', kind: 'card_purchase', type: 'expense', dateOrder: 'dmy',
     all: [A('تم خصم'), A('بطاقة الخصم المباشر'), A('عند')], none: [A('سحب|صراف|atm|رد مبلغ|استرداد|عكس|الغاء|تحويل|ايداع|اضاف|استلام')],
-    shape: shape(`^تم خصم ?(?<amount>${N}) ?${EGPW} من بطاقة الخصم المباشر رقم ?\\d{4} عند ?(?<party>\\S.{0,78}?\\S) ?يوم ?(?<d>\\d{1,2})/(?<mo>\\d{1,2})/(?<y>\\d{4}|\\d{2}) الساعة ?(?<hh>\\d{1,2}):(?<mi>\\d{2}) المتاح ?(?<bal>${N}) ?${EGPW}`) },
+    shape: shape(`^تم خصم ?(?<amount>${N}) ?${EGPW} من بطاقة الخصم المباشر رقم ?\\d{4} عند ?(?<party>\\S.{0,78}?\\S) ?يوم ?(?<d>\\d{1,2})/(?<mo>\\d{1,2})/(?<y>\\d{4}|\\d{2}) الساع[ةه] ?(?<hh>\\d{1,2}):(?<mi>\\d{2}) المتاح ?(?<bal>${N}) ?${EGPW}`) },
   // "تم استلام مبلغ 1.00 جنيه من 010...؛ المسجل بإسم <name> على رقم محفظتك 010... بتاريخ HH:MM YY-MM-DD. رصيدك الحالي: 6.93 جنيه رقم العملية: <ref> ..."
   { id: 'vfc.received.ar', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'transfer_in', type: 'income', dateOrder: 'ymd',
-    all: [A('تم استلام مبلغ'), A('محفظتك'), A('رقم العملية')], none: [A('شحن|لحظي|انستاباي|instapay|خصم')],
+    all: [A('تم استلام مبلغ'), A('محفظتك'), A('رقم العملية')], none: [A('شحن|لحظي|انستاباي|instapay|خصم|تم تحويل|مصاريف الخدمة')],
     shape: shape(`^تم استلام مبلغ ?(?<amount>${N}) ?${EGPW} من ${PHONE} ?[؛;]?(?: ?المسجل باسم (?<party>\\S.{0,78}?\\S))? علي رقم محفظتك ${PHONE} بتاريخ (?<hh>\\d{1,2}):(?<mi>\\d{2}) (?<y>\\d{2})-(?<mo>\\d{1,2})-(?<d>\\d{1,2})\\.? ?رصيدك الحالي: ?(?<bal>${N}) ?${EGPW} ?رقم العملية: ?(?<ref>\\d{6,20})(?!\\d)`) },
   // "تم شحن رصيد موبايلك ب 30 بنجاح وخصم 30 من محفظتك شاملة الضريبة; رصيد حسابك في فودافون كاش الحالي 4.93. <advert>"
   // the amount is what was TAKEN FROM THE WALLET (after "وخصم"); the message carries no date and no reference
   { id: 'vfc.mobile_recharge.ar', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'mobile_recharge', type: 'expense',
-    all: [A('تم شحن رصيد موبايلك'), A('من محفظتك'), A('فودافون كاش')], none: [A('استلام|لحظي|انستاباي|instapay')],
+    all: [A('تم شحن رصيد موبايلك'), A('من محفظتك'), A('فودافون كاش')], none: [A('استلام|لحظي|انستاباي|instapay|تم تحويل|مصاريف الخدمة|رقم العملية')],
     shape: shape(`^تم شحن رصيد موبايلك ب ?(?<topup>${N}) بنجاح وخصم (?<amount>${N}) من محفظتك(?: شاملة الضريبة)? ?[؛;]? ?رصيد حسابك في فودافون كاش الحالي (?<bal>${N})(?![\\d,]|\\.\\d)`) },
+  // "تم تحويل 105 جنيه لرقم 010... مصاريف الخدمة 0 جنيه رصيد حسابك فى فودافون كاش الحالي 3.93. تاريخ العملية HH:MM YY-MM-DD : رقم العملية <ref> : <advert>"
+  // the recipient is only a phone number: it is matched and thrown away. The service fee has its own place; only a
+  // fee of 0 has been seen, so a message with any other fee is refused (fee_not_verified) instead of guessing
+  // whether the fee is part of the amount.
+  { id: 'vfc.sent.ar', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'transfer_out', type: 'expense', dateOrder: 'ymd',
+    all: [A('تم تحويل'), A('لرقم'), A('مصاريف الخدمة'), A('فودافون كاش'), A('رقم العملية')], none: [A('شحن|استلام|لحظي|انستاباي|instapay|بطاق')],
+    shape: shape(`^تم تحويل ?(?<amount>${N}) ?${EGPW} لرقم ${PHONE} مصاريف الخدمة ?(?<fee>${N}) ?${EGPW} رصيد حسابك في فودافون كاش الحالي (?<bal>${N})\\.? ?تاريخ العملية (?<hh>\\d{1,2}):(?<mi>\\d{2}) (?<y>\\d{2})-(?<mo>\\d{1,2})-(?<d>\\d{1,2}) ?:? ?رقم العملية ?:? ?(?<ref>\\d{6,20})(?!\\d)`) },
 ];
 
 /* ---- PROVISIONAL rules: written from the typical wording of such messages, NOT checked against real ones.
@@ -251,9 +259,6 @@ const PROVISIONAL = [
   { id: 'vfc.sent.en', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'transfer_out', type: 'expense',
     all: [W('transferred|sent|paid'), W('wallet|vodafone cash')], none: [W('received|refund\\w*|revers\\w*|instapay|ipn')],
     amount: amt('transferred|sent|paid', EN_FILL), party: party(`${NB}to`) },
-  { id: 'vfc.sent.ar', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'transfer_out', type: 'expense',
-    all: [A('تحويل|دفع'), A('محفظ|فودافون كاش')], none: [A('استلام|رد مبلغ|استرداد|عكس|الغاء|انستاباي|instapay')],
-    amount: amt('تحويل|دفع', AR_FILL), party: party(`\\sالي(?:\\s+رقم)?`) },
 ];
 export const PROVISIONAL_RULES = PROVISIONAL.map((x) => ({ ...x, provisional: true }));
 export const RULES = [...VERIFIED_RULES, ...PROVISIONAL_RULES];
@@ -284,6 +289,7 @@ export function parseSms(text, opts = {}) {
     if (!m) return { ok: false, reason: 'structure_mismatch', rule: r.id };
     const g = m.groups, v = parseAmount(g.amount);
     if (v === null || (g.bal !== undefined && parseAmount(g.bal) === null && Number(g.bal) !== 0) || (g.topup !== undefined && parseAmount(g.topup) === null)) return { ok: false, reason: 'amount_malformed', rule: r.id };
+    if (g.fee !== undefined && !/^0+(?:\.0+)?$/.test(g.fee)) return { ok: false, reason: parseAmount(g.fee) === null ? 'amount_malformed' : 'fee_not_verified', rule: r.id };
     const when = resolveDate(g, now);
     if (when.error) return { ok: false, reason: when.error, rule: r.id };
     let who = ''; if (m.indices.groups.party) { const [s, e] = m.indices.groups.party; who = clean.slice(s, e).replace(/^[\s"'«»:؛;،,-]+|[\s"'«».؛;،,:-]+$/g, ''); }
@@ -322,7 +328,7 @@ export function describe(p) {
   switch (p.kind) {
     case 'mobile_recharge': return { category: 'Vodafone Cash mobile recharge', note: note() };
     case 'card_purchase': return { category: who || 'Expense', note: note() };
-    case 'transfer_out': return { category: who || 'Expense', note: note('Transfer') };
+    case 'transfer_out': return { category: who || (p.provider === 'vodafone_cash' ? 'Vodafone Cash transfer' : 'Expense'), note: note('Transfer') };
     case 'atm_withdrawal': return { category: 'Withdraw cash', note: note() };
     case 'cash_deposit': return { category: 'Cash back to bank', note: note() };
     case 'refund': return { category: 'Add income', note: note('Refund', who) };

@@ -273,22 +273,6 @@
     "at": "2026-11-12T16:00:00.000Z",
     "date_source": "received"
    }
-  },
-  {
-   "id": "vfcash_out_ar",
-   "issuer": "vodafone_cash",
-   "text": "تم تحويل 150 جنيه الى رقم 01098765432 من محفظة فودافون كاش رقم العملية 0012345999",
-   "expect": {
-    "provider": "vodafone_cash",
-    "kind": "transfer_out",
-    "type": "expense",
-    "rule": "vfc.sent.ar",
-    "amount": 150,
-    "party": "01098765432",
-    "reference": "0012345999",
-    "at": "2026-11-12T16:00:00.000Z",
-    "date_source": "received"
-   }
   }
  ],
  "_real_now": "2026-11-12T20:00:00Z",
@@ -401,6 +385,226 @@
    "describe": {
     "category": "Vodafone Cash mobile recharge",
     "note": "Bank SMS · Vodafone Cash"
+   }
+  },
+  {
+   "id": "real2_vfcash_out",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم تحويل 105 جنيه لرقم 01064773881 مصاريف الخدمة 0 جنيه رصيد حسابك فى فودافون كاش الحالي 3.93.\nتاريخ العملية 16:54 26-10-22 :\nرقم العملية 024986273684 :\nحول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "vfc.sent.ar",
+    "amount": 105,
+    "party": "",
+    "reference": "024986273684",
+    "at": "2026-10-22T13:54:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Vodafone Cash transfer",
+    "note": "Transfer · Bank SMS · Vodafone Cash · ref 024986273684"
+   }
+  },
+  {
+   "id": "real2_vfcash_in_en_name",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم استلام مبلغ 8.80 جنيه من 01095872700؛\nالمسجل بإسم MOHAMED ELGHANDOUR\nعلى رقم محفظتك 01095872700 بتاريخ 10:55 26-10-22.\nرصيدك الحالي: 8.93 جنيه\nرقم العملية: 024975484746\nتقدر تتابع كل مصروفاتك من تاريخ المعاملات على أبلكيشن أنا فودافون http://vf.eg/vfcash",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "transfer_in",
+    "type": "income",
+    "rule": "vfc.received.ar",
+    "amount": 8.8,
+    "party": "MOHAMED ELGHANDOUR",
+    "reference": "024975484746",
+    "at": "2026-10-22T07:55:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Add income",
+    "note": "From MOHAMED ELGHANDOUR · Bank SMS · Vodafone Cash · ref 024975484746"
+   }
+  },
+  {
+   "id": "real2_vfcash_recharge_5",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم شحن رصيد موبايلك ب 5 بنجاح وخصم 5 من محفظتك شاملة الضريبة; رصيد حسابك في فودافون كاش الحالي 0.13. حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "mobile_recharge",
+    "type": "expense",
+    "rule": "vfc.mobile_recharge.ar",
+    "amount": 5,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-12T20:00:00.000Z",
+    "date_source": "received"
+   },
+   "describe": {
+    "category": "Vodafone Cash mobile recharge",
+    "note": "Bank SMS · Vodafone Cash"
+   }
+  },
+  {
+   "id": "real2_vfcash_recharge_30",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم شحن رصيد موبايلك ب 30 بنجاح وخصم 30 من محفظتك شاملة الضريبة; رصيد حسابك في فودافون كاش الحالي 8.13. حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "mobile_recharge",
+    "type": "expense",
+    "rule": "vfc.mobile_recharge.ar",
+    "amount": 30,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-12T20:00:00.000Z",
+    "date_source": "received"
+   },
+   "describe": {
+    "category": "Vodafone Cash mobile recharge",
+    "note": "Bank SMS · Vodafone Cash"
+   }
+  },
+  {
+   "id": "real2_instapay_in_en_name",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم إضافة تحويل لحظي لحسابكم رقم 0170 بمبلغ 9.00 جم من MOHAMED ELGHANDOUR رقم مرجعي 490012399928 يوم 11-03 الساعة 21:28 للمزيد اتصل بـ 19623",
+   "expect": {
+    "provider": "instapay",
+    "kind": "transfer_in",
+    "type": "income",
+    "rule": "nbe.instapay_in.ar",
+    "amount": 9,
+    "party": "MOHAMED ELGHANDOUR",
+    "reference": "490012399928",
+    "at": "2026-11-03T19:28:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Add income",
+    "note": "From MOHAMED ELGHANDOUR · Bank SMS · InstaPay · ref 490012399928"
+   }
+  },
+  {
+   "id": "real2_instapay_out_masked_en",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم تنفيذ تحويل لحظي من حسابكم رقم 0170 بمبلغ 1.00 جم إلى RAHMA K***** E***** رقم مرجعي 249461388464 يوم 11-03 الساعة 21:55 للمزيد اتصل بـ 19623",
+   "expect": {
+    "provider": "instapay",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "nbe.instapay_out.ar",
+    "amount": 1,
+    "party": "RAHMA K***** E*****",
+    "reference": "249461388464",
+    "at": "2026-11-03T19:55:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "RAHMA K***** E*****",
+    "note": "Transfer · Bank SMS · InstaPay · ref 249461388464"
+   }
+  },
+  {
+   "id": "real2_card_wekalet_182",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 182 EGP  من بطاقة الخصم المباشر رقم 2521  عند WEKALET ELMANSOURA  يوم 09/11/26  الساعه 15:23  المتاح 23.35EGP  للمزيد إتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 182,
+    "party": "WEKALET ELMANSOURA",
+    "reference": "",
+    "at": "2026-11-09T13:23:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "WEKALET ELMANSOURA",
+    "note": "Bank SMS · Debit card"
+   }
+  },
+  {
+   "id": "real2_card_wekalet_20",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 20 EGP  من بطاقة الخصم المباشر رقم 2521  عند WEKALET ELMANSOURA  يوم 09/11/26  الساعه 21:36  المتاح 3.35EGP  للمزيد إتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 20,
+    "party": "WEKALET ELMANSOURA",
+    "reference": "",
+    "at": "2026-11-09T19:36:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "WEKALET ELMANSOURA",
+    "note": "Bank SMS · Debit card"
+   }
+  },
+  {
+   "id": "real2_card_market_200",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 200 EGP من بطاقة الخصم المباشر رقم2521 عندMansoura Market 2       D يوم10/11/26 الساعة15:19 المتاح8.35EGP  للمزيد اتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 200,
+    "party": "Mansoura Market 2 D",
+    "reference": "",
+    "at": "2026-11-10T13:19:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Mansoura Market 2 D",
+    "note": "Bank SMS · Debit card"
+   }
+  },
+  {
+   "id": "real2_card_zainy_800",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 800 EGP من بطاقة الخصم المباشر رقم2521 عندBM AL ZAINY TOWER       D يوم13/11/26 الساعة10:14 المتاح11.31EGP  للمزيد اتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 800,
+    "party": "BM AL ZAINY TOWER D",
+    "reference": "",
+    "at": "2026-11-13T08:14:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "BM AL ZAINY TOWER D",
+    "note": "Bank SMS · Debit card"
    }
   }
  ]
