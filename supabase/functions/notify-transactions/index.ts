@@ -107,7 +107,7 @@ export async function handle(req, env, fetchFn = fetch) {
   // 2. the notifications that are due for the caller's household(s); each can be claimed exactly once
   let due;
   try { due = (await rpc('push_claim', { caller: uid })) || []; }
-  catch (e) { console.error('notify-transactions: claim failed', String(e && e.message || e)); return reply(500, { error: 'claim failed' }); }
+  catch (e) { console.error('notify-transactions: claim failed', String(e && e.message || e)); return reply(500, { error: 'claim failed', detail: clip(e && e.message || e, 200) }); }
 
   const appId = env.ONESIGNAL_APP_ID || DEFAULT_APP_ID;
   const auth = (/^os_v2_/.test(key) ? 'Key ' : 'Basic ') + key;

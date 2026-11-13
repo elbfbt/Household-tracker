@@ -85,7 +85,8 @@ const RPC={
 window.supabase={createClient(){return{auth,from:t=>new Query(t),
   /* Edge Function stand-in: like the real one it takes no parameters, claims each pending outbox row of the caller's household once, and "sends" to the devices of that household's members */
   functions:{invoke:async(n,o)=>{if(!await wire('fn '+n))return{data:null,error:{message:'Failed to send a request to the Edge Function'}};const d=db(),me=uid();if(!me)return{data:null,error:{message:'not signed in'}};
-    if(JSON.parse(localStorage.getItem('mock_cfg')||'{}').pushFail)return{data:null,error:{message:'Edge Function returned a non-2xx status code'}};
+    const pf=JSON.parse(localStorage.getItem('mock_cfg')||'{}').pushFail;if(pf==='nokey')return{data:{configured:false,claimed:0,sent:0,failed:0},error:null};
+    if(pf){const F={404:{code:'NOT_FOUND',message:'Requested function was not found'},401:{code:401,message:'Invalid JWT'}}[pf]||{error:'claim failed',detail:'push_claim: 404'};return{data:null,error:{name:'FunctionsHttpError',message:'Edge Function returned a non-2xx status code',context:{status:+pf>1?+pf:500,json:async()=>F}}}}
     const hs=d.members.filter(m=>m.user_id===me).map(m=>m.household_id);let c=0;(d.outbox||[]).forEach(x=>{if(x.status==='pending'&&hs.includes(x.household_id)){x.status='sent';c++;
       (d.pushes=d.pushes||[]).push({tx:x.tx,body:o&&o.body,to:(d.push_devices||[]).filter(p=>p.user_id!==(d.transactions.find(t=>t.id===x.tx)||{}).user_id&&d.members.some(m=>m.household_id===x.household_id&&m.user_id===p.user_id)).map(p=>p.subscription_id).sort()})}});save(d);return{data:{claimed:c},error:null}}},
   rpc(n,a){return{then(x,y){return(async()=>{if(!await wire('rpc '+n))return netFail();const d=db(),me=uid();if(!me)return{data:null,error:{message:'JWT expired',code:'PGRST301'},status:401};
