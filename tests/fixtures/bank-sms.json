@@ -1,0 +1,611 @@
+{
+ "_status": "Two kinds of messages. real_messages: REAL production SMS supplied by the user - authoritative, the verified rules are written against them, never edit their text. messages: PROVISIONAL texts written for the tests from typical wording (not real); the rules they exercise are switched off in the deployed function.",
+ "_now": "2026-11-12T16:00:00Z",
+ "messages": [
+  {
+   "id": "card_en",
+   "issuer": "nbe",
+   "text": "Your card ending 1234 was charged EGP 1,250.50 at CARREFOUR MAADI on 12/11/2026 14:35. Available balance EGP 10,000.00. Ref 123456789012",
+   "expect": {
+    "provider": "bank_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.card_purchase.en",
+    "amount": 1250.5,
+    "party": "CARREFOUR MAADI",
+    "reference": "123456789012",
+    "at": "2026-11-12T12:35:00.000Z",
+    "date_source": "sms"
+   }
+  },
+  {
+   "id": "atm_en",
+   "issuer": "nbe",
+   "text": "Cash withdrawal of EGP 2,000.00 from ATM using card ending 1234 on 12/11/2026 at 09:15. Available balance EGP 8,000.00",
+   "expect": {
+    "provider": "atm",
+    "kind": "atm_withdrawal",
+    "type": "withdraw",
+    "rule": "nbe.atm_withdrawal.en",
+    "amount": 2000,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-12T07:15:00.000Z",
+    "date_source": "sms"
+   }
+  },
+  {
+   "id": "atm_ar",
+   "issuer": "nbe",
+   "text": "تم سحب نقدي بمبلغ ٢٠٠٠ جنيه من ماكينة الصراف الآلي ببطاقة رقم 1234 بتاريخ 12/11/2026 09:15",
+   "expect": {
+    "provider": "atm",
+    "kind": "atm_withdrawal",
+    "type": "withdraw",
+    "rule": "nbe.atm_withdrawal.ar",
+    "amount": 2000,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-12T07:15:00.000Z",
+    "date_source": "sms"
+   }
+  },
+  {
+   "id": "cash_deposit_en",
+   "issuer": "nbe",
+   "text": "Cash deposit of EGP 3,000.00 to your account ending 5678 via ATM on 11/11/2026 10:00. Available balance EGP 11,000.00",
+   "expect": {
+    "provider": "atm",
+    "kind": "cash_deposit",
+    "type": "deposit",
+    "rule": "nbe.cash_deposit.en",
+    "amount": 3000,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-11T08:00:00.000Z",
+    "date_source": "sms"
+   }
+  },
+  {
+   "id": "cash_deposit_ar",
+   "issuer": "nbe",
+   "text": "تم إيداع نقدي بمبلغ 3,000.00 جنيه في حسابكم رقم 5678 بتاريخ 11/11/2026",
+   "expect": {
+    "provider": "atm",
+    "kind": "cash_deposit",
+    "type": "deposit",
+    "rule": "nbe.cash_deposit.ar",
+    "amount": 3000,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-11T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "credit_en",
+   "issuer": "nbe",
+   "text": "Your account ending 5678 has been credited with EGP 15,000.00 from ACME COMPANY on 01/11/2026. Available balance EGP 26,000.00",
+   "expect": {
+    "provider": "bank",
+    "kind": "credit",
+    "type": "income",
+    "rule": "nbe.credit.en",
+    "amount": 15000,
+    "party": "ACME COMPANY",
+    "reference": "",
+    "at": "2026-11-01T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "credit_ar",
+   "issuer": "nbe",
+   "text": "تم إضافة مبلغ 15,000.00 جنيه إلى حسابكم رقم 5678 بتاريخ 01/11/2026 الرصيد المتاح 26,000.00 جنيه",
+   "expect": {
+    "provider": "bank",
+    "kind": "credit",
+    "type": "income",
+    "rule": "nbe.credit.ar",
+    "amount": 15000,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-01T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "transfer_en",
+   "issuer": "nbe",
+   "text": "A transfer of EGP 500.00 from your account ending 5678 to MOHAMED ALI was executed on 12/11/2026. Ref FT26317ABC",
+   "expect": {
+    "provider": "bank",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "nbe.transfer_out.en",
+    "amount": 500,
+    "party": "MOHAMED ALI",
+    "reference": "FT26317ABC",
+    "at": "2026-11-12T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "transfer_ar",
+   "issuer": "nbe",
+   "text": "تم تحويل مبلغ 500.00 جنيه من حسابكم رقم 5678 إلى محمد علي بتاريخ 12/11/2026 رقم مرجعي 778899",
+   "expect": {
+    "provider": "bank",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "nbe.transfer_out.ar",
+    "amount": 500,
+    "party": "محمد علي",
+    "reference": "778899",
+    "at": "2026-11-12T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "instapay_out_en",
+   "issuer": "nbe",
+   "text": "InstaPay: EGP 750.00 was sent from your account ending 5678 to ahmed@instapay on 12/11/2026 18:20. Reference 987654321",
+   "expect": {
+    "provider": "instapay",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "nbe.instapay_out.en",
+    "amount": 750,
+    "party": "ahmed@instapay",
+    "reference": "987654321",
+    "at": "2026-11-12T16:20:00.000Z",
+    "date_source": "sms"
+   }
+  },
+  {
+   "id": "instapay_in_en",
+   "issuer": "nbe",
+   "text": "InstaPay: you received EGP 300.00 in your account ending 5678 from SARA HASSAN on 12/11/2026 08:05. Reference 555666777",
+   "expect": {
+    "provider": "instapay",
+    "kind": "transfer_in",
+    "type": "income",
+    "rule": "nbe.instapay_in.en",
+    "amount": 300,
+    "party": "SARA HASSAN",
+    "reference": "555666777",
+    "at": "2026-11-12T06:05:00.000Z",
+    "date_source": "sms"
+   }
+  },
+  {
+   "id": "refund_en",
+   "issuer": "nbe",
+   "text": "Refund of EGP 120.00 from AMAZON EG to your card ending 1234 on 10/11/2026. Available balance EGP 9,000.00",
+   "expect": {
+    "provider": "bank_card",
+    "kind": "refund",
+    "type": "income",
+    "rule": "nbe.refund.en",
+    "amount": 120,
+    "party": "AMAZON EG",
+    "reference": "",
+    "at": "2026-11-10T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "refund_ar",
+   "issuer": "nbe",
+   "text": "تم رد مبلغ 120.00 جنيه إلى بطاقتكم رقم 1234 من AMAZON EG بتاريخ 10/11/2026",
+   "expect": {
+    "provider": "bank_card",
+    "kind": "refund",
+    "type": "income",
+    "rule": "nbe.refund.ar",
+    "amount": 120,
+    "party": "AMAZON EG",
+    "reference": "",
+    "at": "2026-11-10T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "reversal_en",
+   "issuer": "nbe",
+   "text": "Transaction of EGP 120.00 at NOON on card ending 1234 has been reversed on 10/11/2026",
+   "expect": {
+    "provider": "bank_card",
+    "kind": "reversal",
+    "type": "income",
+    "rule": "nbe.reversal.en",
+    "amount": 120,
+    "party": "NOON",
+    "reference": "",
+    "at": "2026-11-10T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "reversal_ar",
+   "issuer": "nbe",
+   "text": "تم عكس عملية بمبلغ 120.00 جنيه على بطاقتكم رقم 1234 لدى NOON بتاريخ 10/11/2026",
+   "expect": {
+    "provider": "bank_card",
+    "kind": "reversal",
+    "type": "income",
+    "rule": "nbe.reversal.ar",
+    "amount": 120,
+    "party": "NOON",
+    "reference": "",
+    "at": "2026-11-10T10:00:00.000Z",
+    "date_source": "sms_date_only"
+   }
+  },
+  {
+   "id": "vfcash_in_en",
+   "issuer": "vodafone_cash",
+   "text": "You have received EGP 200.00 from 01012345678 to your Vodafone Cash wallet. Transaction ID 0012345678. Your balance is EGP 450.00",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "transfer_in",
+    "type": "income",
+    "rule": "vfc.received.en",
+    "amount": 200,
+    "party": "01012345678",
+    "reference": "0012345678",
+    "at": "2026-11-12T16:00:00.000Z",
+    "date_source": "received"
+   }
+  },
+  {
+   "id": "vfcash_out_en",
+   "issuer": "vodafone_cash",
+   "text": "You have transferred EGP 150.00 to 01098765432 from your Vodafone Cash wallet. Transaction ID 0012345999",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "vfc.sent.en",
+    "amount": 150,
+    "party": "01098765432",
+    "reference": "0012345999",
+    "at": "2026-11-12T16:00:00.000Z",
+    "date_source": "received"
+   }
+  }
+ ],
+ "_real_now": "2026-11-12T20:00:00Z",
+ "real_messages": [
+  {
+   "id": "real_instapay_out",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم تنفيذ تحويل لحظي من حسابكم رقم 0170 بمبلغ 1.00 جم إلى محمد ا**** ا*** ع** ح**** ا****** رقم مرجعي 456611434599 يوم 11-12 الساعة 17:24 للمزيد اتصل بـ 19623",
+   "expect": {
+    "provider": "instapay",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "nbe.instapay_out.ar",
+    "amount": 1,
+    "party": "محمد ا**** ا*** ع** ح**** ا******",
+    "reference": "456611434599",
+    "at": "2026-11-12T15:24:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "محمد ا**** ا*** ع** ح**** ا******",
+    "note": "Transfer · Bank SMS · InstaPay · ref 456611434599"
+   }
+  },
+  {
+   "id": "real_instapay_in",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم إضافة تحويل لحظي لحسابكم رقم 0170 بمبلغ 205.00 جم من عبير على زين العابدين القصبى قداح رقم مرجعي 467579444840 يوم 11-12 الساعة 21:26 للمزيد اتصل بـ 19623",
+   "expect": {
+    "provider": "instapay",
+    "kind": "transfer_in",
+    "type": "income",
+    "rule": "nbe.instapay_in.ar",
+    "amount": 205,
+    "party": "عبير على زين العابدين القصبى قداح",
+    "reference": "467579444840",
+    "at": "2026-11-12T19:26:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Add income",
+    "note": "From عبير على زين العابدين القصبى قداح · Bank SMS · InstaPay · ref 467579444840"
+   }
+  },
+  {
+   "id": "real_debit_card",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 200 EGP من بطاقة الخصم المباشر رقم2521 عندMansoura Market 2       D يوم12/11/26 الساعة21:43 المتاح11.31EGP للمزيد اتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 200,
+    "party": "Mansoura Market 2 D",
+    "reference": "",
+    "at": "2026-11-12T19:43:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Mansoura Market 2 D",
+    "note": "Bank SMS · Debit card"
+   }
+  },
+  {
+   "id": "real_vfcash_in",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم استلام مبلغ 1.00 جنيه من 01095872700؛\nالمسجل بإسم محمد اسامه احمد علي حسنين\nعلى رقم محفظتك 01095872700 بتاريخ 17:21 26-11-12.\nرصيدك الحالي: 6.93 جنيه\nرقم العملية: 025712695852\nتقدر تتابع كل مصروفاتك من تاريخ المعاملات على أبلكيشن أنا فودافون http://vf.eg/vfcash",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "transfer_in",
+    "type": "income",
+    "rule": "vfc.received.ar",
+    "amount": 1,
+    "party": "محمد اسامه احمد علي حسنين",
+    "reference": "025712695852",
+    "at": "2026-11-12T15:21:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Add income",
+    "note": "From محمد اسامه احمد علي حسنين · Bank SMS · Vodafone Cash · ref 025712695852"
+   }
+  },
+  {
+   "id": "real_vfcash_recharge",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم شحن رصيد موبايلك ب 30 بنجاح وخصم 30 من محفظتك شاملة الضريبة; رصيد حسابك في فودافون كاش الحالي 4.93. حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "mobile_recharge",
+    "type": "expense",
+    "rule": "vfc.mobile_recharge.ar",
+    "amount": 30,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-12T20:00:00.000Z",
+    "date_source": "received"
+   },
+   "describe": {
+    "category": "Vodafone Cash mobile recharge",
+    "note": "Bank SMS · Vodafone Cash"
+   }
+  },
+  {
+   "id": "real2_vfcash_out",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم تحويل 105 جنيه لرقم 01064773881 مصاريف الخدمة 0 جنيه رصيد حسابك فى فودافون كاش الحالي 3.93.\nتاريخ العملية 16:54 26-10-22 :\nرقم العملية 024986273684 :\nحول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "vfc.sent.ar",
+    "amount": 105,
+    "party": "",
+    "reference": "024986273684",
+    "at": "2026-10-22T13:54:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Vodafone Cash transfer",
+    "note": "Transfer · Bank SMS · Vodafone Cash · ref 024986273684"
+   }
+  },
+  {
+   "id": "real2_vfcash_in_en_name",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم استلام مبلغ 8.80 جنيه من 01095872700؛\nالمسجل بإسم MOHAMED ELGHANDOUR\nعلى رقم محفظتك 01095872700 بتاريخ 10:55 26-10-22.\nرصيدك الحالي: 8.93 جنيه\nرقم العملية: 024975484746\nتقدر تتابع كل مصروفاتك من تاريخ المعاملات على أبلكيشن أنا فودافون http://vf.eg/vfcash",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "transfer_in",
+    "type": "income",
+    "rule": "vfc.received.ar",
+    "amount": 8.8,
+    "party": "MOHAMED ELGHANDOUR",
+    "reference": "024975484746",
+    "at": "2026-10-22T07:55:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Add income",
+    "note": "From MOHAMED ELGHANDOUR · Bank SMS · Vodafone Cash · ref 024975484746"
+   }
+  },
+  {
+   "id": "real2_vfcash_recharge_5",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم شحن رصيد موبايلك ب 5 بنجاح وخصم 5 من محفظتك شاملة الضريبة; رصيد حسابك في فودافون كاش الحالي 0.13. حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "mobile_recharge",
+    "type": "expense",
+    "rule": "vfc.mobile_recharge.ar",
+    "amount": 5,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-12T20:00:00.000Z",
+    "date_source": "received"
+   },
+   "describe": {
+    "category": "Vodafone Cash mobile recharge",
+    "note": "Bank SMS · Vodafone Cash"
+   }
+  },
+  {
+   "id": "real2_vfcash_recharge_30",
+   "real": true,
+   "sender": "VF-Cash",
+   "issuer": "vodafone_cash",
+   "text": "تم شحن رصيد موبايلك ب 30 بنجاح وخصم 30 من محفظتك شاملة الضريبة; رصيد حسابك في فودافون كاش الحالي 8.13. حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer",
+   "expect": {
+    "provider": "vodafone_cash",
+    "kind": "mobile_recharge",
+    "type": "expense",
+    "rule": "vfc.mobile_recharge.ar",
+    "amount": 30,
+    "party": "",
+    "reference": "",
+    "at": "2026-11-12T20:00:00.000Z",
+    "date_source": "received"
+   },
+   "describe": {
+    "category": "Vodafone Cash mobile recharge",
+    "note": "Bank SMS · Vodafone Cash"
+   }
+  },
+  {
+   "id": "real2_instapay_in_en_name",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم إضافة تحويل لحظي لحسابكم رقم 0170 بمبلغ 9.00 جم من MOHAMED ELGHANDOUR رقم مرجعي 490012399928 يوم 11-03 الساعة 21:28 للمزيد اتصل بـ 19623",
+   "expect": {
+    "provider": "instapay",
+    "kind": "transfer_in",
+    "type": "income",
+    "rule": "nbe.instapay_in.ar",
+    "amount": 9,
+    "party": "MOHAMED ELGHANDOUR",
+    "reference": "490012399928",
+    "at": "2026-11-03T19:28:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Add income",
+    "note": "From MOHAMED ELGHANDOUR · Bank SMS · InstaPay · ref 490012399928"
+   }
+  },
+  {
+   "id": "real2_instapay_out_masked_en",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم تنفيذ تحويل لحظي من حسابكم رقم 0170 بمبلغ 1.00 جم إلى RAHMA K***** E***** رقم مرجعي 249461388464 يوم 11-03 الساعة 21:55 للمزيد اتصل بـ 19623",
+   "expect": {
+    "provider": "instapay",
+    "kind": "transfer_out",
+    "type": "expense",
+    "rule": "nbe.instapay_out.ar",
+    "amount": 1,
+    "party": "RAHMA K***** E*****",
+    "reference": "249461388464",
+    "at": "2026-11-03T19:55:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "RAHMA K***** E*****",
+    "note": "Transfer · Bank SMS · InstaPay · ref 249461388464"
+   }
+  },
+  {
+   "id": "real2_card_wekalet_182",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 182 EGP  من بطاقة الخصم المباشر رقم 2521  عند WEKALET ELMANSOURA  يوم 09/11/26  الساعه 15:23  المتاح 23.35EGP  للمزيد إتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 182,
+    "party": "WEKALET ELMANSOURA",
+    "reference": "",
+    "at": "2026-11-09T13:23:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "WEKALET ELMANSOURA",
+    "note": "Bank SMS · Debit card"
+   }
+  },
+  {
+   "id": "real2_card_wekalet_20",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 20 EGP  من بطاقة الخصم المباشر رقم 2521  عند WEKALET ELMANSOURA  يوم 09/11/26  الساعه 21:36  المتاح 3.35EGP  للمزيد إتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 20,
+    "party": "WEKALET ELMANSOURA",
+    "reference": "",
+    "at": "2026-11-09T19:36:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "WEKALET ELMANSOURA",
+    "note": "Bank SMS · Debit card"
+   }
+  },
+  {
+   "id": "real2_card_market_200",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 200 EGP من بطاقة الخصم المباشر رقم2521 عندMansoura Market 2       D يوم10/11/26 الساعة15:19 المتاح8.35EGP  للمزيد اتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 200,
+    "party": "Mansoura Market 2 D",
+    "reference": "",
+    "at": "2026-11-10T13:19:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "Mansoura Market 2 D",
+    "note": "Bank SMS · Debit card"
+   }
+  },
+  {
+   "id": "real2_card_zainy_800",
+   "real": true,
+   "sender": "BanK-AIAhly",
+   "issuer": "nbe",
+   "text": "تم خصم 800 EGP من بطاقة الخصم المباشر رقم2521 عندBM AL ZAINY TOWER       D يوم13/11/26 الساعة10:14 المتاح11.31EGP  للمزيد اتصل ب ١٩٦٢٣",
+   "expect": {
+    "provider": "debit_card",
+    "kind": "card_purchase",
+    "type": "expense",
+    "rule": "nbe.debit_card_purchase.ar",
+    "amount": 800,
+    "party": "BM AL ZAINY TOWER D",
+    "reference": "",
+    "at": "2026-11-13T08:14:00.000Z",
+    "date_source": "sms"
+   },
+   "describe": {
+    "category": "BM AL ZAINY TOWER D",
+    "note": "Bank SMS · Debit card"
+   }
+  }
+ ]
+}

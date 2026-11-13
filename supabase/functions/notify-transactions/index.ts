@@ -74,6 +74,7 @@ export function compose(n, lang) {
   return { title: '🔔 ' + L.title[type], body: L[type](who, L.money(amount(n.amount)), what, route) };
 }
 
+const sameSecret = (x, y) => { x = String(x || ''); y = String(y || ''); if (!y || x.length !== y.length) return false; let d = 0; for (let i = 0; i < x.length; i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i); return d === 0; };
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
@@ -96,7 +97,15 @@ export async function handle(req, env, fetchFn = fetch) {
   // is decided by Supabase Auth from the user's token alone, so a made-up key gains nothing.
   const apiKeys = [...new Set([req.headers.get('apikey'), env.SUPABASE_ANON_KEY, env.SUPABASE_PUBLISHABLE_KEY, service].map((k) => String(k || '').trim()).filter(Boolean))];
   let uid = null, unavailable = '', refused = '';
-  for (const apikey of apiKeys) {
+  // Server-to-server call from another Edge Function of this project (bank-sms-import): it proves itself with the
+  // project's service-role key - which never leaves the server - and names the user whose household is due.
+  // Everything after this point is identical: push_claim() still only hands out that user's household(s).
+  if (sameSecret(token, service)) {
+    let b = null; try { b = await req.json(); } catch (_e) { /* no body */ }
+    uid = b && typeof b.on_behalf_of === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.on_behalf_of) ? b.on_behalf_of : null;
+    if (!uid) return reply(400, { error: 'on_behalf_of (user id) is required for a server call', stage: 'function:server-call' });
+  }
+  for (const apikey of uid ? [] : apiKeys) {
     let r;
     try { r = await fetchFn(`${base}/auth/v1/user`, { headers: { Authorization: `Bearer ${token}`, apikey } }); }
     catch (e) { unavailable = clip(e && e.message || e, 120); continue; }

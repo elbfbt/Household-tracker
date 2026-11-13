@@ -3,3 +3,8 @@
 # a request without a valid user session token is answered with 401 by the function.
 [functions.notify-transactions]
 verify_jwt = false
+
+# bank-sms-import is called by a phone automation with an import key (not a browser session), so the gateway's
+# JWT check must be off. It is NOT public: every request needs a valid, unexpired import key (401 otherwise).
+[functions.bank-sms-import]
+verify_jwt = false

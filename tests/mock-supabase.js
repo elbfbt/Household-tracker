@@ -63,6 +63,14 @@ class Query{constructor(t){this.t=t;this.f=[];this.op='select';this.ord=[]}
     return{data:rows,error:null,status:200}}}
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo'}).format(new Date());
 const RPC={
+  // bank-SMS internal transfers. d.bank_xfer absent = migration 011 not installed (the app must tolerate that).
+  bank_transfer_candidates(d,me,{h}){if(!d.bank_xfer)return{__err:{message:'Could not find the function public.bank_transfer_candidates(h) in the schema cache',code:'PGRST202'},__status:404};return d.bank_xfer},
+  bank_transfer_confirm(d,me,{o,i}){const X=d.bank_xfer,c=X&&X.candidates.find(x=>x.out_import===o&&x.in_import===i);if(!c)return{status:'not_eligible',reason:'conditions_not_met'};
+    const a=d.transactions.find(t=>t.id===c.out_transaction_id),b=d.transactions.find(t=>t.id===c.in_transaction_id),id='00000000-0000-4000-8000-0000000000ff';
+    d.transactions=d.transactions.filter(t=>t!==a&&t!==b);d.transactions.push({id,household_id:a.household_id,user_id:a.user_id,type:'transfer',amount:a.amount,wallet_id:a.wallet_id,to_wallet_id:b.wallet_id,category:'Transfer',note:'Bank SMS · internal transfer',created_at:a.created_at,updated_at:new Date().toISOString()});
+    X.candidates=X.candidates.filter(x=>x!==c);X.merged.push({id:'m1',amount:c.amount,at:c.at,decided_at:new Date().toISOString(),transaction_id:id,from_wallet:c.from_wallet,to_wallet:c.to_wallet,decided_by:'',can_undo:true,_orig:[a,b]});return{status:'merged',merge_id:'m1',transaction_id:id}},
+  bank_transfer_dismiss(d,me,{o,i}){const X=d.bank_xfer;if(!X)return{status:'not_found'};X.candidates=X.candidates.filter(x=>!(x.out_import===o&&x.in_import===i));return{status:'dismissed'}},
+  bank_transfer_undo(d,me,{mid}){const X=d.bank_xfer,g=X&&X.merged.find(x=>x.id===mid);if(!g)return{status:'not_found'};d.transactions=d.transactions.filter(t=>t.id!==g.transaction_id);d.transactions.push(...g._orig);X.merged=X.merged.filter(x=>x!==g);return{status:'undone'}},
   household_summary(d,me,{h}){const t=d.transactions.filter(x=>x.household_id===h),ex=t.filter(x=>x.type==='expense').reduce((a,x)=>a+ +x.amount,0);
     return{balance:t.reduce((a,x)=>a+(x.type==='income'?+x.amount:x.type==='expense'?-x.amount:0),0),today:ex,week:ex,month:ex}},
   wallet_balances(d,me,{h}){return d.wallets.filter(w=>w.household_id===h).map(w=>({id:w.id,name:w.name,balance:wbal(d,w.id)}))},

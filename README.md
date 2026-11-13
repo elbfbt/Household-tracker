@@ -156,3 +156,145 @@ this version the answer is never swallowed: a setup problem is shown once per ap
 | server error (HTTP 500: claim failed - …) | the database function `push_claim` could not be called; the text after the dash is the database's reason | run the current `010 transaction notifications.sql` |
 
 Rows that are still `pending` are delivered by the first successful call - no manual step.
+
+## Version 9 — Bank SMS import (backend only; the iPhone Shortcut is NOT built yet)
+
+`SMS text → bank-sms-import (import key) → deterministic parser → one normal transaction → existing outbox → notify-transactions → OneSignal`
+
+**Files:** `011 bank sms import.sql` (migration), `supabase/functions/bank-sms-import/index.ts` (new Edge Function),
+`tests/bank.test.mjs` + `tests/fixtures/bank-sms.json`, `tools/bank-sms-parse.mjs` (offline parser check).
+
+**Which messages are imported.** Only wording that was verified against real messages creates transactions:
+
+| Sender | Message (Arabic) | Result |
+|---|---|---|
+| BanK-AIAhly | InstaPay sent - "تم تنفيذ تحويل لحظي من حسابكم … بمبلغ … إلى … رقم مرجعي … يوم MM-DD الساعة HH:MM" | `expense`, description = recipient as written |
+| BanK-AIAhly | InstaPay received - "تم إضافة تحويل لحظي لحسابكم … بمبلغ … من … رقم مرجعي …" | `income`, note "From …" |
+| BanK-AIAhly | Debit card purchase - "تم خصم … من بطاقة الخصم المباشر … عند… يومDD/MM/YY الساعة… المتاح…" | `expense`, description = merchant |
+| Vodafone Cash | Money received - "تم استلام مبلغ … من 01… المسجل بإسم … رصيدك الحالي … رقم العملية …" | `income`, note "From <name>" (the phone number is not kept) |
+| Vodafone Cash | Mobile recharge - "تم شحن رصيد موبايلك ب … بنجاح وخصم … من محفظتك …" | `expense` "Vodafone Cash mobile recharge", amount = what left the wallet |
+| Vodafone Cash | Money sent - "تم تحويل … جنيه لرقم 01… مصاريف الخدمة 0 جنيه رصيد حسابك فى فودافون كاش الحالي … تاريخ العملية … رقم العملية …" | `expense` "Vodafone Cash transfer" (the recipient's phone number is not kept). Only a service fee of 0 has been verified: a message with another fee is refused (`fee_not_verified`) |
+
+Each of these rules describes the whole structure of its message; amount, balance, phone number, reference and
+advert each have a fixed place. A message whose wording differs is answered `unrecognized_sms`
+(`structure_mismatch`) and nothing is created.
+
+Everything else in the rule list (ATM withdrawal, cash deposit, account credit, plain bank transfer, refund,
+reversal, all English wording) is **provisional**: written without a real message, and
+therefore switched off in the deployed function. Such a message is answered `unrecognized_sms` until a real example
+is supplied and its rule verified. (`BANK_SMS_PROVISIONAL_RULES=on` exists for the tests only - never set it.)
+
+A Vodafone Cash key must be created with the sender name the phone shows for those messages and with the wallet
+that represents the Vodafone Cash balance - the default wallet of a key is "Bank account":
+
+```sql
+select bank_import_key_new((select id from auth.users where email = 'YOUR-LOGIN-EMAIL'), 'VF-Cash',
+  (select w.id from wallets w join members m on m.household_id = w.household_id
+    where m.user_id = (select id from auth.users where email = 'YOUR-LOGIN-EMAIL') and w.name = 'YOUR VODAFONE CASH WALLET NAME'),
+  null, 365);
+```
+
+### When the wallet holds too little
+
+The bank has already completed the transaction, so the import is recorded even if the app's wallet balance is too
+low (the app's figure may be out of date). The wallet then shows a negative balance and the answer contains
+`"balance_negative": true`. No balancing entry is invented - correct the wallet yourself by adding the missing
+income. Entries typed into the app keep the normal "Insufficient funds" rule, so a negative wallet cannot be spent
+from by hand until it is topped up; further bank imports are still recorded. Only the import function can do this,
+for its single entry; the database rule itself, the constraints and RLS are unchanged.
+
+### Transfers between two wallets of the household (suggest, then confirm)
+
+When one member sends money to another member (or to their own second wallet) and both phones import their
+message, the books first show an expense on one wallet and an income on the other. The two messages share no
+identifier, so nothing is merged automatically. The app only **suggests** a pair when all of this holds: same
+household, one verified outgoing-transfer import and one verified incoming-transfer import, two different wallets
+(taken from the import keys), exactly the same amount, message times at most 15 minutes apart, neither entry edited
+or deleted, and no other possible pairing on either side. Ambiguous cases and one-sided imports are left alone - a
+transfer to someone outside the household stays an expense.
+
+The Home screen shows a card "Possible internal transfer" with two buttons (for the two members involved and the
+household owner):
+
+- **Merge into one transfer** - `bank_transfer_confirm`: one atomic operation that replaces the two entries by one
+  entry of the existing type *Transfer* (wallet A → wallet B). Wallet balances are identical before and after; the
+  amount no longer counts as income or expense. No notification is sent for it. Sending either SMS again still
+  answers `already_imported`.
+- **Not a transfer** - `bank_transfer_dismiss`: the pair is not offered again; nothing changes.
+
+A merge of the last 7 days shows **Undo merge** (`bank_transfer_undo`): the two original entries come back with the
+same ids, creator, wallet, amount, description, note and time; the same import records point at them again. Undo is
+refused if the merged transfer was edited or deleted in the meantime. An undone pair is not suggested again.
+Decisions are kept in the table `bank_transfer_merges` (who, when, the complete original rows).
+
+One existing database function is touched for this: `tx_before()` gets a single added condition so that these two
+operations may re-create an entry in the name of its original creator; for entries made in the app the rule
+"you can only create entries for yourself" is unchanged.
+
+### What becomes what
+
+| Message | App transaction | Wallets |
+|---|---|---|
+| card purchase | `expense` | bank wallet |
+| ATM withdrawal | `withdraw` | bank wallet → cash wallet |
+| cash deposit at ATM/branch | `deposit` | cash wallet → bank wallet |
+| account credited, InstaPay / Vodafone Cash received | `income` | bank wallet |
+| bank transfer / InstaPay / Vodafone Cash **sent to someone** | `expense` (description = recipient, note "Transfer · …") | bank wallet |
+| refund, reversal | `income` (note "Refund · …" / "Reversal · …") | bank wallet |
+
+The app's `transfer` type means "between two wallets of the same household". An SMS never says that, so money sent
+to another person is recorded as an expense. Imported entries carry the note `Bank SMS · <service> [· ref …]` and a
+row in `bank_imports` (readable by household members).
+
+### Security model
+
+- One **import key** per user and sender (`htk_` + 64 hex). Created by the signed-in user or from the SQL editor,
+  shown once, stored only as SHA-256, expires (default 365 days), revocable.
+- The key decides user, household and wallets. `user_id`, `household_id`, `wallet_id` in a request are never read.
+- The request's `sender` must match the key's sender, and the sender must be one the parser knows.
+- Duplicates: `unique(household_id, fingerprint)` in `bank_imports`. Fingerprint = provider + kind + amount + bank
+  reference, or + the whole normalised message when there is no reference.
+- The SMS text is neither stored nor logged.
+
+### Manual Supabase steps
+
+1. SQL editor: run `011 bank sms import.sql` (after 010).
+2. Edge Functions: create `bank-sms-import` from `supabase/functions/bank-sms-import/index.ts`;
+   switch "Verify JWT with legacy secret" **OFF** (the function checks the import key itself).
+3. Edge Functions: redeploy `notify-transactions` from the repository (one small addition: it accepts a call from
+   `bank-sms-import` so the notification goes out without anyone opening the app). If you skip this, imports still
+   work and the notification is delivered the next time a member opens the app.
+4. No new secret.
+
+### Create an import key (SQL editor)
+
+```sql
+select bank_import_key_new((select id from auth.users where email = 'YOUR-LOGIN-EMAIL'), 'BanK-AIAhly', null, null, 365);
+```
+
+The result contains `key` (copy it now - it cannot be shown again), and the wallets it is bound to (`Bank account`
+and the household's default cash wallet, unless wallet ids are given instead of the two `null`s).
+Revoke: `update bank_import_keys set revoked_at = now() where user_id = (select id from auth.users where email = '…');`
+
+### Test without a phone
+
+Dry run (parses, resolves wallets, checks duplicates, writes nothing):
+
+```bash
+curl -s https://veftmxsqgbbhtrakmvbz.supabase.co/functions/v1/bank-sms-import \
+  -H "Authorization: Bearer htk_YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"sender":"BanK-AIAhly","dry_run":true,"text":"<paste a real bank SMS here, not older than 90 days>"}'
+```
+
+Remove `"dry_run":true` to create the entry; send the same request again to see `already_imported`.
+The same request can be sent from the Supabase dashboard (Edge Functions → bank-sms-import → Test).
+Parser only, offline: `node --no-warnings tools/bank-sms-parse.mjs "BanK-AIAhly" "<sms text>"`.
+
+| HTTP | `status` | Meaning |
+|---|---|---|
+| 200 | `imported` / `already_imported` / `would_import` | done / duplicate / dry run |
+| 401 | `unauthorized` | key missing, wrong, expired, revoked, or the user left the household |
+| 403 | `sender_not_allowed` / `sender_not_supported` | sender differs from the key's / no rules for this sender |
+| 409 | `wallet_required` | the key's bank or cash wallet no longer exists |
+| 409 | `rejected` | another of the app's rules refused the entry (`transaction_refused`); nothing was written. A low wallet balance is **not** a reason - see below |
+| 422 | `unrecognized_sms` | not confidently parsed (`reason` says why); nothing was written |
