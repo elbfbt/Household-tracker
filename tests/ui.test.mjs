@@ -437,10 +437,10 @@ console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v13'))return false;const c=await caches.open('ht-v13');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v14'))return false;const c=await caches.open('ht-v14');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
-  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v13');await new Promise(r=>setTimeout(r,200));
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v14');await new Promise(r=>setTimeout(r,200));
     return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
       cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
   eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');
@@ -472,5 +472,22 @@ await test('"Not a transfer" removes the card and changes no entry; a member who
   p=await open({uid:M,lang:'ar'});await p.go();await p.dash();await p.setDb(new Function('d','('+XSEED.toString()+')(d);d.bank_xfer.candidates[0].can_decide=false'));await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();
   await p.wait(()=>document.querySelector('#itx .xc'));const t=await p.text('#itx');ok(/تحويل داخلي محتمل/.test(t)&&!/Possible internal/.test(t),t);eq(await p.has('#itx button'),false);
   await p.net(false);await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();eq(await p.page.$eval('#itx',e=>e.hidden),true,'offline: suggestions are not shown from stale data');noErr(p);await p.close()});
+
+console.log('\nHome "Recent": most recently recorded first');
+await test('an entry recorded NOW but dated two days ago (bank SMS import) is first in Recent and shows its own date; History stays chronological; a new manual entry still appears first',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();
+  await p.setDb(d=>{const H=d.households[0].id,WB=d.wallets.find(w=>w.name==='Bank account').id,old=new Date(Date.now()-2*86400e3).toISOString();
+    d.transactions.push({id:'00000000-0000-4000-8000-0000000000b1',client_id:null,household_id:H,user_id:d.users[0].id,type:'expense',amount:200,wallet_id:WB,to_wallet_id:null,category:'Mansoura Market 2 D',note:'Bank SMS · Debit card',created_at:old,updated_at:new Date().toISOString()})});
+  await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.wait(()=>/Mansoura Market/.test(document.querySelector('#tl').textContent));
+  const rows=()=>p.page.$$eval('#tl .tx',r=>r.map(e=>e.textContent.replace(/\u00a0/g,' ')));let r=await rows();
+  eq(r.length,5);ok(/Mansoura Market 2 D/.test(r[0])&&/EGP 200\.00/.test(r[0]),'the back-dated entry is the first row: '+r[0]);
+  const day=new Date(Date.now()-2*86400e3).toLocaleString('en-GB',{timeZone:'Africa/Cairo',day:'numeric',month:'short'});ok(r[0].includes(day),'it shows the date of the transaction ('+day+'), not today: '+r[0]);
+  ok(/Vegetables/.test(r[1])&&/Bread/.test(r[2]),'the others keep their order: '+r.slice(1,3).join(' | '));
+  eq(await p.text('#bal'),'EGP 530.00','balance = 730 - 200');
+  await addExpense(p,7,'Tea');await p.wait(()=>/Tea/.test((document.querySelector('#tl .tx')||{}).textContent||''));await p.status(/Online/);
+  await p.wait(()=>!/waiting to sync/.test(document.querySelector('#tl').textContent));r=await rows();ok(/Tea/.test(r[0])&&/Mansoura Market/.test(r[1]),'a manual entry made now is first, as before: '+r.slice(0,2).join(' | '));
+  await p.page.$eval('#nv button[data-n="hist"]',e=>e.click());await p.wait(()=>document.querySelectorAll('#hl .tx').length>=7);
+  const h=await p.page.$$eval('#hl .tx',r=>r.map(e=>e.textContent));const at=h.findIndex(x=>/Mansoura Market/.test(x));
+  ok(/Tea/.test(h[0]),'History: newest transaction time first');eq(at,h.length-1,'History: the two-day-old purchase is at its chronological place (the oldest), not on top');noErr(p);await p.close()});
 }catch(e){console.error(e);process.exitCode=1}
 finally{done('ui');await browser.close();server.close()}

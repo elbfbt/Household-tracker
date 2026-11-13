@@ -356,7 +356,7 @@ async function load(){
   loading++;netPaint();
   try{
     const [a,b,c,d,e,f]=await Promise.all([sb.rpc('household_summary',{h}),sb.from('quick_items').select('*').eq('household_id',h).order('name'),
-      sb.from('transactions').select('*,profiles(name)').eq('household_id',h).order('created_at',{ascending:false}).order('id').limit(40),sb.rpc('wallet_balances',{h}),sb.from('members').select('user_id,role').eq('household_id',h).eq('user_id',me),sb.rpc('bank_transfer_candidates',{h})].map(p=>p.then(x=>x,er=>({error:er}))));
+      sb.from('transactions').select('*,profiles(name)').eq('household_id',h).order('updated_at',{ascending:false}).order('id').limit(40)/* Home "Recent" = most recently RECORDED (updated_at), so an entry dated in the past, e.g. a bank SMS import, is visible; each row still shows its own date. History stays chronological. */,sb.rpc('wallet_balances',{h}),sb.from('members').select('user_id,role').eq('household_id',h).eq('user_id',me),sb.rpc('bank_transfer_candidates',{h})].map(p=>p.then(x=>x,er=>({error:er}))));
     if(my!==loadSeq||!hh||hh.id!==h)return;                       // a newer load (or logout / account switch) owns the screen now
     if(!e.error&&e.data&&!e.data.length)return lostAccess();
     xfer=(f&&!f.error&&f.data&&typeof f.data==='object')?f.data:{candidates:[],merged:[]};   /* optional: absent when bank import is not installed */
