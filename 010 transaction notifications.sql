@@ -4,7 +4,20 @@
 -- entry (so it exists only if the entry was committed) and can never make the entry fail.
 --
 --   push_devices          which OneSignal subscription (= one browser/phone) belongs to which signed-in user
---   notification_outbox   one row per new transaction: pending -> sending -> sent | failed | skipped
+--   notification_outbox   one row per new transaction: pending -> sending -> sent | skipped | failed
+--
+-- LIFE OF A NOTIFICATION
+--   pending   queued when the transaction was committed. It STAYS deliverable until it has been processed:
+--             closing the app, being offline or a OneSignal outage only delay it.
+--   sending   claimed by one run of the Edge Function (a run that died is taken over after 2 minutes;
+--             OneSignal idempotency keys make the repeat harmless).
+--   sent      OneSignal accepted it for the household's devices.
+--   skipped   processed, nothing to deliver: nobody except the creator has a subscribed device.
+--   failed    PERMANENT, always with a reason in "error". The only ways to get here:
+--               a) OneSignal rejected the request itself as invalid (HTTP 4xx other than 401/403/429);
+--               b) 10 delivery attempts failed (network errors, OneSignal 5xx/429, wrong/missing key ...);
+--               c) it could not be delivered for 48 hours (see push_claim: too old to be news).
+--   (a deleted transaction takes its notification with it)
 -- Neither table is readable or writable from the browser (RLS on, no policies, privileges revoked).
 
 create table if not exists push_devices(
@@ -22,8 +35,11 @@ create table if not exists notification_outbox(
   household_id uuid not null references households(id) on delete cascade,
   status text not null default 'pending' check(status in('pending','sending','sent','failed','skipped')),
   recipients int, error text,
+  attempts int not null default 0,                       -- delivery attempts so far
+  next_attempt_at timestamptz not null default now(),    -- retry back-off
+  done_langs text[] not null default '{}',               -- language batches OneSignal already accepted (never sent again)
   created_at timestamptz not null default now(), claimed_at timestamptz, done_at timestamptz);
-create index if not exists notification_outbox_pending_idx on notification_outbox(household_id) where status='pending';
+create index if not exists notification_outbox_pending_idx on notification_outbox(household_id) where status in('pending','sending');
 alter table notification_outbox enable row level security;
 revoke all on notification_outbox from anon, authenticated;
 
@@ -69,50 +85,85 @@ end $$;
 revoke execute on function unregister_push_device(text) from public,anon;
 grant execute on function unregister_push_device(text) to authenticated;
 
+-- WHO is notified about a transaction: the devices of the CURRENT members of its household, grouped by app language.
+-- The person who made the entry is NOT notified about their own entry (application rule).
+-- This function is the single place that decides recipients - a future per-user notification-preference system
+-- (e.g. "also notify me", "mute expenses") only has to change this function.
+create or replace function push_targets(h uuid, actor uuid) returns jsonb
+language sql stable security definer set search_path=public,pg_temp as $$
+ select coalesce(jsonb_object_agg(x.lang,x.ids),'{}'::jsonb) from
+  (select d.lang, jsonb_agg(distinct d.subscription_id) ids
+     from members m join push_devices d on d.user_id=m.user_id
+    where m.household_id=h
+      and (actor is null or m.user_id<>actor)            -- never the creator
+    group by d.lang) x
+$$;
+revoke execute on function push_targets(uuid,uuid) from public,anon,authenticated;
+grant execute on function push_targets(uuid,uuid) to service_role;
+
 -- SERVER ONLY (Edge Function, service role). Atomically takes the due notifications of the households the CALLER
 -- (already authenticated by the Edge Function) belongs to and returns, for each, the text ingredients and the
 -- devices to notify. Household and recipients come from the database only - nothing is supplied by the browser.
--- A row can be claimed once: a second/concurrent call gets nothing (no duplicate notifications).
-create or replace function push_claim(caller uuid, max_age interval default interval '15 minutes') returns jsonb
+-- A row is handed to ONE run at a time: a second/concurrent call gets nothing (no duplicate notifications).
+-- A committed transaction's notification never silently disappears: it stays claimable until processed. Only after
+-- give_up (48 hours) without a successful delivery is it closed as failed, with the reason recorded.
+create or replace function push_claim(caller uuid, batch int default 25, give_up interval default interval '48 hours') returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare out jsonb;
 begin
  if caller is null then return '[]'::jsonb; end if;
- -- too old to be news (e.g. nobody could deliver it at the time): never send late
- update notification_outbox o set status='skipped', error='expired', done_at=now()
-  where o.status='pending' and o.created_at < now()-max_age
+ update notification_outbox o set status='failed', done_at=now(),
+        error=coalesce(nullif(o.error,'')||' | ','')||'not delivered within '||give_up::text||' - given up'
+  where o.status in('pending','sending') and o.created_at < now()-give_up
+    and (o.status='pending' or o.claimed_at < now()-interval '2 minutes')
     and o.household_id in (select m.household_id from members m where m.user_id=caller);
- with c as (
-  update notification_outbox o set status='sending', claimed_at=now()
-   where o.status='pending' and o.household_id in (select m.household_id from members m where m.user_id=caller)
-   returning o.id, o.transaction_id, o.household_id, o.created_at)
+ with due as (
+  select o.id from notification_outbox o
+   where o.household_id in (select m.household_id from members m where m.user_id=caller)
+     and ((o.status='pending' and o.next_attempt_at<=now())
+       or (o.status='sending' and o.claimed_at < now()-interval '2 minutes'))        -- a run that died: take over
+   order by o.created_at limit greatest(1,least(coalesce(batch,25),100)) for update skip locked),
+ c as (
+  update notification_outbox o set status='sending', claimed_at=now(), attempts=o.attempts+1
+   from due where o.id=due.id
+   returning o.id, o.transaction_id, o.household_id, o.created_at, o.attempts, o.done_langs)
  select coalesce(jsonb_agg(jsonb_build_object(
    'id',c.id, 'key_en',c.id, 'key_ar',md5(c.id::text||':ar')::uuid,
+   'attempt',c.attempts, 'done_langs',to_jsonb(c.done_langs),
    'type',t.type, 'amount',t.amount, 'category',t.category, 'note',t.note,
-   'actor_id',t.user_id, 'actor',coalesce(p.name,''),
+   'actor',coalesce(p.name,''),
    'wallet',w.name, 'to_wallet',w2.name,
    'builtin_key',(select q.key from quick_items q where q.household_id=c.household_id and q.key is not null and q.name=t.category limit 1),
-   'targets',coalesce((select jsonb_object_agg(x.lang,x.ids) from
-       (select d.lang, jsonb_agg(distinct d.subscription_id) ids
-          from members m join push_devices d on d.user_id=m.user_id     -- CURRENT members of THIS household only
-         where m.household_id=c.household_id group by d.lang) x),'{}'::jsonb),
-   'actor_devices',coalesce((select jsonb_agg(d.subscription_id) from push_devices d where d.user_id=t.user_id),'[]'::jsonb)
+   'targets',push_targets(c.household_id,t.user_id)
   ) order by c.created_at),'[]'::jsonb) into out
  from c join transactions t on t.id=c.transaction_id
  left join profiles p on p.id=t.user_id left join wallets w on w.id=t.wallet_id left join wallets w2 on w2.id=t.to_wallet_id;
  return out;
 end $$;
-revoke execute on function push_claim(uuid,interval) from public,anon,authenticated;
-grant execute on function push_claim(uuid,interval) to service_role;
+revoke execute on function push_claim(uuid,int,interval) from public,anon,authenticated;
+grant execute on function push_claim(uuid,int,interval) to service_role;
 
--- SERVER ONLY. Record the outcome; forget device ids OneSignal reported as no longer valid.
-create or replace function push_done(nid uuid, st text, n int default null, err text default null, bad text[] default null) returns void
+-- SERVER ONLY. Record the outcome of one run.
+--   st = 'sent' | 'skipped' | 'failed' (permanent) | 'retry' (temporary problem: back to pending with a back-off;
+--        after 10 attempts it is closed as failed). langs = language batches OneSignal accepted in this run.
+--   bad = device ids OneSignal reported as no longer valid -> forgotten.
+create or replace function push_done(nid uuid, st text, n int default null, err text default null, bad text[] default null, langs text[] default null) returns void
 language plpgsql security definer set search_path=public,pg_temp as $$
+declare max_attempts constant int:=10;
 begin
- update notification_outbox set status=case when st in('sent','failed','skipped') then st else 'failed' end,
-   recipients=n, error=left(err,500), done_at=now() where id=nid and status='sending';
+ update notification_outbox o set
+   done_langs=(select coalesce(array_agg(distinct x),'{}') from unnest(o.done_langs||coalesce(langs,'{}')) x),
+   recipients=coalesce(o.recipients,0)+coalesce(n,0),
+   error=case when err is null then o.error else left(err,500) end,
+   status=case when st in('sent','skipped','failed') then st
+               when o.attempts>=max_attempts then 'failed' else 'pending' end,
+   next_attempt_at=case when st='retry' and o.attempts<max_attempts then now()+least(interval '1 minute'*power(2,o.attempts-1),interval '1 hour') else o.next_attempt_at end,
+   done_at=case when st in('sent','skipped','failed') or o.attempts>=max_attempts then now() else null end
+  where o.id=nid and o.status='sending';
+ update notification_outbox o set error=left(coalesce(o.error,'')||' | gave up after '||max_attempts||' attempts',500)
+  where o.id=nid and o.status='failed' and st='retry' and position('gave up' in coalesce(o.error,''))=0;
  if bad is not null and array_length(bad,1)>0 then delete from push_devices where subscription_id=any(bad); end if;
  delete from notification_outbox where done_at < now()-interval '30 days';       -- keep the log small
 end $$;
-revoke execute on function push_done(uuid,text,int,text,text[]) from public,anon,authenticated;
-grant execute on function push_done(uuid,text,int,text,text[]) to service_role;
+revoke execute on function push_done(uuid,text,int,text,text[],text[]) from public,anon,authenticated;
+grant execute on function push_done(uuid,text,int,text,text[],text[]) to service_role;

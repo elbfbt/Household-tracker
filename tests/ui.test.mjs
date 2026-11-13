@@ -365,7 +365,7 @@ await test('login identity: OneSignal external id = Supabase user id, and the de
   const p=await open({uid:M,lang:'ar'});await subscribed(p);await withSdk(p);await p.go();await p.dash();
   await p.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).some(d=>d.subscription_id===s),SUB);
   eq(await p.page.evaluate(()=>[window.__os.calls.filter(c=>c.startsWith('login')),window.__os.lang]),[['login:'+M],'ar']);
-  eq((await p.db()).push_devices,[{subscription_id:SUB,user_id:M,lang:'ar'}]);eq(await fnCalls(p),0,'nothing is sent just by opening the app:');noErr(p);await p.close()});
+  eq((await p.db()).push_devices,[{subscription_id:SUB,user_id:M,lang:'ar'}]);await p.wait(()=>window.__calls.some(c=>c.name==='fn notify-transactions'),null,9000);await sleep(200);eq([await fnCalls(p),((await p.db()).pushes||[]).length],[1,0],'opening the app asks once for queued notifications; none are due:');noErr(p);await p.close()});
 await test('a device that has not allowed notifications is not registered',async()=>{
   const p=await open({uid:M});await withSdk(p);await p.go();await p.dash();await p.wait(()=>window.__os&&window.__os.calls.some(c=>c.startsWith('login')));await sleep(300);
   eq((await p.db()).push_devices||[],[]);await menu(p);await p.wait(()=>!document.querySelector('#pn').hidden);await p.page.click('#pn');
@@ -373,22 +373,31 @@ await test('a device that has not allowed notifications is not registered',async
   await menu(p);await p.page.click('#pn');await p.wait(()=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).length===0);noErr(p);await p.close()});
 await test('online entry: the notify function is called only after the entry is saved, with no parameters; one notification',async()=>{
   const p=await open({uid:M});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);const n0=(await p.db()).transactions.length;
+  await p.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).some(d=>d.subscription_id===s),SUB);await p.setDb(d=>{d.push_devices.push({subscription_id:'bbbbbbbb-0000-4000-8000-000000000002',user_id:'00000000-0000-4000-8000-00000000000a',lang:'en'})});
   await addExpense(p,5,'Gum');await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(()=>(JSON.parse(localStorage.getItem('mock_db')).pushes||[]).length===1);
-  const d=await p.db(),t=d.transactions.at(-1);eq(d.pushes,[{tx:t.id,body:{},to:[SUB]}]);
-  const order=await p.page.evaluate(()=>window.__calls.map(c=>c.name).filter(n=>n==='insert transactions'||n==='fn notify-transactions'));eq(order,['insert transactions','fn notify-transactions']);noErr(p);await p.close()});
+  const d=await p.db(),t=d.transactions.at(-1);eq(d.pushes,[{tx:t.id,body:{},to:['bbbbbbbb-0000-4000-8000-000000000002']}],'the other member is notified, the creator (this device) is not:');
+  const order=await p.page.evaluate(()=>window.__calls.map(c=>c.name).filter(n=>n==='insert transactions'||n==='fn notify-transactions'));ok(order.indexOf('insert transactions')>=0&&order.lastIndexOf('fn notify-transactions')>order.indexOf('insert transactions'),order.join());noErr(p);await p.close()});
 await test('offline entry: nothing is sent while it only exists on the phone; after it syncs exactly one notification; later syncs / reloads add none',async()=>{
   const p=await open({uid:M});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);const n0=(await p.db()).transactions.length;
+  await p.wait(()=>window.__calls.some(c=>c.name==='fn notify-transactions'),null,9000);const c0=await fnCalls(p);       // the once-per-launch check is done
   await p.net(false);await p.status(/Offline/);await addExpense(p,7,'Offline tea');await p.wait(()=>[...document.querySelectorAll('#tl .tm b')].some(b=>b.textContent==='Offline tea'));await sleep(400);
-  eq([await fnCalls(p),((await p.db()).pushes||[]).length,(await p.db()).transactions.length],[0,0,n0],'offline: no call, no notification, nothing on the server:');
+  eq([await fnCalls(p)-c0,((await p.db()).pushes||[]).length,(await p.db()).transactions.length],[0,0,n0],'offline: no call, no notification, nothing on the server:');
   await p.net(true);await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(()=>(JSON.parse(localStorage.getItem('mock_db')).pushes||[]).length===1);
   await p.page.evaluate(()=>localStorage.removeItem('__offline'));await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.status(/Online/);await sleep(400);
   const d=await p.db();eq([d.transactions.length,d.pushes.length,d.outbox.filter(o=>o.status==='pending').length],[n0+1,1,0]);noErr(p);await p.close()});
 await test('entry rejected by the server: no notification; notify function failing: the entry stays saved and no error is shown',async()=>{
   const p=await open({uid:M,cfg:{pushFail:true}});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);const n0=(await p.db()).transactions.length;
-  await addExpense(p,99999,'Too much',WP);await p.wait(()=>/Insufficient funds/.test(document.querySelector('#toast')?.textContent||''));eq([await fnCalls(p),(await p.db()).transactions.length],[0,n0]);
-  await sleep(4800);await addExpense(p,5,'Gum');await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(()=>window.__calls.some(c=>c.name==='fn notify-transactions'));await sleep(300);
+  await addExpense(p,99999,'Too much',WP);await p.wait(()=>/Insufficient funds/.test(document.querySelector('#toast')?.textContent||''));eq([((await p.db()).outbox||[]).length,(await p.db()).transactions.length],[0,n0],'nothing queued for a rejected entry:');
+  await sleep(4800);const c1=await fnCalls(p);await addExpense(p,5,'Gum');await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(c=>window.__calls.filter(x=>x.name==='fn notify-transactions').length>c,c1);await sleep(300);
   eq(await p.toast(),'','no error toast for a notification problem:');eq(((await p.db()).pushes||[]).length,0);ok((await p.text('#tl')).includes('Gum'));
   eq(p.errors.filter(e=>!/notifications:/.test(e)),[]);await p.close()});
+await test('creator closed the app before the notification went out: it stays queued and is delivered when another member opens the app (once)',async()=>{
+  const p=await open({uid:M});await subscribed(p);await withSdk(p);
+  await p.page.evaluateOnNewDocument(()=>{if(localStorage.getItem('__q1'))return;localStorage.setItem('__q1','1');const d=JSON.parse(localStorage.getItem('mock_db'));const t=d.transactions.find(x=>x.category==='Vegetables');   // Omar's entry from days ago, never announced
+    d.outbox=[{tx:t.id,household_id:t.household_id,status:'pending'}];localStorage.setItem('mock_db',JSON.stringify(d))});
+  await p.go();await p.dash();await p.wait(()=>(JSON.parse(localStorage.getItem('mock_db')).pushes||[]).length===1,null,9000);
+  eq((await p.db()).pushes.map(x=>x.to),[[SUB]]);await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.wait(()=>window.__calls.some(c=>c.name==='fn notify-transactions'),null,9000);await sleep(200);
+  eq((await p.db()).pushes.length,1,'not delivered twice:');noErr(p);await p.close()});
 await test('log out, then another account logs in on the same phone: device is released, then belongs to the new account only',async()=>{
   const p=await open({uid:M});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).length===1);
   await menu(p);await p.page.click('#lo');await p.wait(()=>!!document.querySelector('#em'));
@@ -410,10 +419,10 @@ console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v10'))return false;const c=await caches.open('ht-v10');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v11'))return false;const c=await caches.open('ht-v11');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
-  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v10');await new Promise(r=>setTimeout(r,200));
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v11');await new Promise(r=>setTimeout(r,200));
     return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
       cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
   eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');

@@ -193,8 +193,11 @@ const EXPIRED='Your session expired. Log in again. Your unsynced entries are kep
 /* ---- push identity + household notifications -----------------------------------------------------------------
    HTPushDevice: called by the push script to tell the DATABASE which signed-in user this device belongs to (or that it
    no longer belongs to them). The server targets notifications from that table + household membership only.
-   pokeNotify: after entries were really saved on the server, ask the Edge Function to deliver what is due. It sends no
-   parameters - household and recipients are decided on the server. Failures never affect the saved entries. */
+   pokeNotify: ask the Edge Function to deliver the household's queued notifications. It sends no parameters -
+   household and recipients are decided on the server. Called (1) right after entries were really saved on the
+   server and (2) once whenever the app is opened with a valid session, so a notification that could not go out
+   earlier (creator closed the app at once, OneSignal was down) is delivered by the next member who opens the app.
+   Failures never affect the saved entries. */
 window.HTPushDevice=async(sub,on,lang)=>{if(!me||!sessionOk||!navigator.onLine||!sub)return false;
   try{const r=await timeout(sb.rpc(on?'register_push_device':'unregister_push_device',on?{sub,lng:lang==='ar'?'ar':'en'}:{sub}).then(x=>x,e=>({error:e})),8000);
     if(r&&r.error)console.warn('push device:',r.error.message||r.error);return!!r&&!r.error}catch(e){return false}};
@@ -242,6 +245,7 @@ async function boot(){
   const uid=session.user.id;sessionOk=true;authLost=false;
   if(uid!==me){if(shown){shown=false;dropDash();hh=null}setUser(uid)}
   LS.setItem('ht_last_uid',uid);adoptLegacy();pushIdentify();
+  if(!window._poked){window._poked=1;setTimeout(()=>{if(me&&sessionOk)pokeNotify()},3500)}      // after startup, never competing with it
   if(!shown&&!$('#boot'))shellView();
   const r=(await timeout(sb.from('members').select('role,households(id,name,invite_code)').eq('user_id',uid).limit(1).then(x=>x,e=>({error:e})),12000))||{error:{message:'The server is taking too long to answer.'}};
   if(my!==bootSeq)return;

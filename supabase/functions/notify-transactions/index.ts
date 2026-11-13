@@ -10,10 +10,13 @@
 //      each exactly once, together with the devices of the CURRENT members of that household;
 //   3. it sends them through the OneSignal REST API and records the result with push_done().
 // A OneSignal failure is only recorded: the transaction was committed before any of this started.
+// Recipients = the household's current members EXCEPT the person who made the entry (decided in the database
+// function push_targets, not here and not by the browser).
+// Temporary problems (network, OneSignal 5xx/429, wrong key) put the notification back in the queue for a later
+// attempt; only an invalid request, 10 failed attempts or 48 hours without delivery close it as failed.
 //
 // Secret required (Supabase > Edge Functions > Secrets):  ONESIGNAL_REST_API_KEY
-// Optional: ONESIGNAL_APP_ID (defaults to the app's public id), NOTIFY_SKIP_CREATOR=true (do not notify the person
-// who made the entry), APP_URL (page opened when a notification is tapped).
+// Optional: ONESIGNAL_APP_ID (defaults to the app's public id), APP_URL (page opened when a notification is tapped).
 // SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are provided to every Edge Function by Supabase.
 // (This file is plain JavaScript on purpose so the same code is exercised by the repository's tests.)
 
@@ -91,7 +94,7 @@ export async function handle(req, env, fetchFn = fetch) {
   } catch (_e) { return reply(503, { error: 'auth unavailable' }); }
   if (!uid) return reply(401, { error: 'not signed in' });
 
-  // Without the OneSignal key nothing is claimed (rows simply expire) - the app itself is unaffected.
+  // Without the OneSignal key nothing is claimed: notifications stay queued until the key is configured.
   const key = env.ONESIGNAL_REST_API_KEY;
   if (!key) { console.error('notify-transactions: ONESIGNAL_REST_API_KEY is not set'); return reply(200, { configured: false, claimed: 0, sent: 0, failed: 0 }); }
 
@@ -106,22 +109,22 @@ export async function handle(req, env, fetchFn = fetch) {
   try { due = (await rpc('push_claim', { caller: uid })) || []; }
   catch (e) { console.error('notify-transactions: claim failed', String(e && e.message || e)); return reply(500, { error: 'claim failed' }); }
 
-  const skipCreator = /^(1|true|yes)$/i.test(String(env.NOTIFY_SKIP_CREATOR || ''));
   const appId = env.ONESIGNAL_APP_ID || DEFAULT_APP_ID;
   const auth = (/^os_v2_/.test(key) ? 'Key ' : 'Basic ') + key;
-  let sent = 0, failed = 0;
+  let sent = 0, failed = 0, retry = 0;
 
   // 3. send: one request per language, every device at most once
   for (const n of due) {
-    let devices = 0; const errors = [], bad = []; let ok = 0, tried = 0; const seen = new Set();
-    const mine = new Set(skipCreator ? (n.actor_devices || []) : []);
+    let devices = 0, tried = 0, temporary = 0, permanent = 0;
+    const errors = [], bad = [], accepted = [], seen = new Set();
+    const already = new Set(n.done_langs || []);                      // batches OneSignal accepted in an earlier attempt
     for (const lang of ['en', 'ar']) {
-      const ids = [...new Set((n.targets && n.targets[lang]) || [])].filter((id) => !mine.has(id) && !seen.has(id));
+      const ids = [...new Set((n.targets && n.targets[lang]) || [])].filter((id) => !seen.has(id));
       ids.forEach((id) => seen.add(id));
-      if (!ids.length) continue;
+      if (!ids.length || already.has(lang)) continue;
       tried++;
       const msg = compose(n, lang);
-      const body = { app_id: appId, target_channel: 'push', include_subscription_ids: ids, idempotency_key: lang === 'ar' ? n.key_ar : n.key_en,
+      const body = { app_id: appId, target_channel: 'push', include_subscription_ids: ids, idempotency_key: lang === 'ar' ? n.key_ar : n.key_en,   // same key on every attempt: OneSignal never delivers one twice
         headings: { en: msg.title }, contents: { en: msg.body } };                      // "en" is OneSignal's default slot; the text is already in the device owner's app language
       if (env.APP_URL) body.web_url = env.APP_URL;
       try {
@@ -130,17 +133,24 @@ export async function handle(req, env, fetchFn = fetch) {
         const inv = j && j.errors && !Array.isArray(j.errors) ? [].concat(j.errors.invalid_player_ids || [], j.errors.invalid_subscription_ids || []) : [];
         inv.forEach((x) => bad.push(String(x)));
         if (r.ok) {
-          ok++; devices += Math.max(0, ids.length - inv.length);
+          accepted.push(lang); devices += Math.max(0, ids.length - inv.length);
           if (j && !j.id) errors.push(`${lang}: accepted but not delivered ${clip(JSON.stringify(j.errors || ''), 160)}`);   // e.g. "All included players are not subscribed"
-        } else errors.push(`${lang}: HTTP ${r.status} ${clip(JSON.stringify(j && j.errors || j), 200)}`);
-      } catch (e) { errors.push(`${lang}: ${clip(e && e.message || e, 200)}`); }
+        } else {
+          errors.push(`${lang}: HTTP ${r.status} ${clip(JSON.stringify(j && j.errors || j), 200)}`);
+          // 401/403 = wrong key (fixable configuration), 429 = rate limit, 5xx = OneSignal trouble -> try again later. Other 4xx = the request itself is invalid -> permanent.
+          if (r.status === 401 || r.status === 403 || r.status === 408 || r.status === 429 || r.status >= 500) temporary++; else permanent++;
+        }
+      } catch (e) { temporary++; errors.push(`${lang}: ${clip(e && e.message || e, 200)}`); }
     }
-    const status = tried === 0 ? 'skipped' : ok === tried ? 'sent' : ok > 0 ? 'sent' : 'failed';
-    if (status === 'failed') { failed++; console.error('notify-transactions: OneSignal failed for', n.id, errors.join(' | ')); } else if (status === 'sent') sent++;
-    try { await rpc('push_done', { nid: n.id, st: status, n: devices, err: errors.length ? errors.join(' | ') : (tried === 0 ? 'no subscribed devices' : null), bad: bad.length ? bad : null }); }
+    const nothingToDo = tried === 0 && already.size === 0;
+    const status = nothingToDo ? 'skipped' : temporary > 0 ? 'retry' : (accepted.length > 0 || already.size > 0) ? 'sent' : 'failed';
+    if (status === 'failed') { failed++; console.error('notify-transactions: OneSignal rejected', n.id, errors.join(' | ')); }
+    else if (status === 'retry') { retry++; console.error(`notify-transactions: attempt ${n.attempt} failed, will retry`, n.id, errors.join(' | ')); }
+    else if (status === 'sent') sent++;
+    try { await rpc('push_done', { nid: n.id, st: status, n: devices, err: errors.length ? errors.join(' | ') : (nothingToDo ? 'no subscribed devices besides the creator' : null), bad: bad.length ? bad : null, langs: accepted.length ? accepted : null }); }
     catch (e) { console.error('notify-transactions: could not record result', String(e && e.message || e)); }
   }
-  return reply(200, { configured: true, claimed: due.length, sent, failed });
+  return reply(200, { configured: true, claimed: due.length, sent, failed, retry });
 }
 
 // Supabase / Deno entry point (absent when the file is imported by the Node tests)

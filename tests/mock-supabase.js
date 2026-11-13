@@ -87,7 +87,7 @@ window.supabase={createClient(){return{auth,from:t=>new Query(t),
   functions:{invoke:async(n,o)=>{if(!await wire('fn '+n))return{data:null,error:{message:'Failed to send a request to the Edge Function'}};const d=db(),me=uid();if(!me)return{data:null,error:{message:'not signed in'}};
     if(JSON.parse(localStorage.getItem('mock_cfg')||'{}').pushFail)return{data:null,error:{message:'Edge Function returned a non-2xx status code'}};
     const hs=d.members.filter(m=>m.user_id===me).map(m=>m.household_id);let c=0;(d.outbox||[]).forEach(x=>{if(x.status==='pending'&&hs.includes(x.household_id)){x.status='sent';c++;
-      (d.pushes=d.pushes||[]).push({tx:x.tx,body:o&&o.body,to:(d.push_devices||[]).filter(p=>d.members.some(m=>m.household_id===x.household_id&&m.user_id===p.user_id)).map(p=>p.subscription_id).sort()})}});save(d);return{data:{claimed:c},error:null}}},
+      (d.pushes=d.pushes||[]).push({tx:x.tx,body:o&&o.body,to:(d.push_devices||[]).filter(p=>p.user_id!==(d.transactions.find(t=>t.id===x.tx)||{}).user_id&&d.members.some(m=>m.household_id===x.household_id&&m.user_id===p.user_id)).map(p=>p.subscription_id).sort()})}});save(d);return{data:{claimed:c},error:null}}},
   rpc(n,a){return{then(x,y){return(async()=>{if(!await wire('rpc '+n))return netFail();const d=db(),me=uid();if(!me)return{data:null,error:{message:'JWT expired',code:'PGRST301'},status:401};
     try{const r=RPC[n](d,me,a||{});if(r&&r.__err)return{data:null,error:r.__err,status:r.__status};save(d);return{data:r,error:null,status:200}}catch(e){return{data:null,error:e,status:400}}})().then(x,y)}}},
   channel(){const c={on(){return c},subscribe(f){setTimeout(()=>f&&f('SUBSCRIBED'),5);return c}};return c},removeChannel(){}}}};

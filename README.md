@@ -99,7 +99,8 @@ icon chooser. "Edit prices" also shows a × on each tile to remove it (past tran
 
 ## Version 8 — Household-only transaction notifications (stage 1)
 
-When a transaction is **committed** in the database, the members of *that* household get a push notification.
+When a transaction is **committed** in the database, the *other* members of that household get a push
+notification. The person who made the entry is not notified about their own entry.
 
 **Setup (once)**
 1. SQL editor: run `010 transaction notifications.sql` (after 009).
@@ -107,20 +108,32 @@ When a transaction is **committed** in the database, the members of *that* house
    (dashboard editor: create function → paste the file; or `supabase functions deploy notify-transactions`).
    Keep "Verify JWT" on.
 3. Edge Functions → Secrets: add `ONESIGNAL_REST_API_KEY` (OneSignal → Settings → Keys & IDs → REST API key).
-   Optional secrets: `NOTIFY_SKIP_CREATOR=true` (do not notify the person who made the entry), `APP_URL`.
+   Optional secret: `APP_URL` (page opened when a notification is tapped).
 
 **How it works**
 - Trigger `tx_notify_outbox` (AFTER INSERT on `transactions`) writes one row to `notification_outbox` inside the
   same database transaction. Rejected / rolled-back entries leave nothing; `transaction_id` is unique.
-- After its entries were saved, the app calls the Edge Function with the user's login token and **no parameters**.
-  The function asks Supabase Auth who is calling, then `push_claim()` hands out the due rows of the caller's
-  household(s) — each exactly once — with the devices of the *current* members (`members` ⨝ `push_devices`).
+- The app calls the Edge Function with the user's login token and **no parameters** (a) right after its entries
+  were saved and (b) once each time the app is opened. The function asks Supabase Auth who is calling, then
+  `push_claim()` hands out the due rows of the caller's household(s), one run at a time.
+- Recipients are decided by the database function `push_targets(household, creator)`: devices of the *current*
+  members (`members` ⨝ `push_devices`) except the creator. A future notification-preference system changes only
+  this function.
 - `push_devices` maps a OneSignal subscription (one browser/phone) to the signed-in user. The app registers it
-  after login (`register_push_device`), removes it at log-out (`unregister_push_device`); a subscription has one
-  owner; rows disappear with a deleted account. The OneSignal external id is also set to the Supabase user id.
-- OneSignal errors are recorded in `notification_outbox.error`; the transaction is never touched. Rows nobody
-  delivered within 15 minutes are skipped (no late alerts). Failed sends are not retried (no duplicates).
-- Neither table is reachable from the browser; `push_claim` / `push_done` are service-role only.
+  after login, removes it at log-out; a subscription has one owner; rows disappear with a deleted account.
+- A queued notification stays deliverable until processed. Temporary problems (network, OneSignal 5xx/429,
+  wrong key) put it back in the queue with a back-off. It is closed as `failed` (reason in
+  `notification_outbox.error`) only when: OneSignal rejects the request as invalid (4xx), 10 attempts failed, or
+  it could not be delivered for 48 hours. `skipped` = nobody but the creator has a subscribed device.
+- No duplicates: one row per transaction, one run per row, the same OneSignal idempotency key on every attempt,
+  and a language batch that was accepted is never sent again.
+- Neither table is reachable from the browser; `push_claim` / `push_done` / `push_targets` are service-role only.
 
-**Tests:** `npm test` → unit 23, database 32, notifications 21 (real Postgres + the real function code + a
-stand-in OneSignal), UI 44.
+**Known limitation (stage 1):** delivery is started by an app of a household member (the creator's, right after
+saving; otherwise the next member who opens the app). If the creator closes the app in the instant between
+"saved" and that call, the others are notified only when someone next opens the app. Removing this needs a
+server-side starter: a database webhook / `pg_net` call on insert plus a `pg_cron` job for retries, calling this
+same function with a server credential. Not included in this stage.
+
+**Tests:** `npm test` → unit 23, database 32, notifications 27 (real Postgres + the real function code + a
+stand-in OneSignal), UI 45.
