@@ -5,33 +5,37 @@
 //                                                                     node --no-warnings tests/bank.test.mjs
 import fs from 'node:fs';import path from 'node:path';
 import {test,eq,ok,throws,done,startDb,MIGRATIONS,ROOT} from './harness.mjs';
-import {handle,parseSms,parseAmount,findDate,cleanSms,foldSms,describe,fingerprint,RULES,SENDERS,normSender,issuerOf,cairoToUtc} from '../supabase/functions/bank-sms-import/index.ts';
+import {handle,parseSms,parseAmount,findDate,cleanSms,foldSms,describe,fingerprint,RULES,VERIFIED_RULES,PROVISIONAL_RULES,SENDERS,normSender,issuerOf,cairoToUtc} from '../supabase/functions/bank-sms-import/index.ts';
 import {handle as notifyHandle} from '../supabase/functions/notify-transactions/index.ts';
 
 const FX=JSON.parse(fs.readFileSync(path.join(ROOT,'tests/fixtures/bank-sms.json'),'utf8'));
 const NOW=Date.parse(FX._now),M=Object.fromEntries(FX.messages.map(m=>[m.id,m]));
-const P=(text,issuer='nbe',now=NOW)=>parseSms(text,{issuer,now});
+const P=(text,issuer='nbe',now=NOW)=>parseSms(text,{issuer,now,provisional:true});           // provisional rules: test-only
+const RNOW=Date.parse(FX._real_now),R=Object.fromEntries(FX.real_messages.map(m=>[m.id,m]));
+const PR=(text,issuer,now=RNOW)=>parseSms(text,{issuer,now});                                   // exactly what the deployed function does
+const nor=(text,reason,issuer)=>{const p=PR(text,issuer);eq([p.ok,p.reason],[false,reason],JSON.stringify(text).slice(0,60)+':')};
 const fx=id=>{const m=M[id],p=P(m.text,m.issuer);eq(p,{ok:true,...m.expect},id+':');return p};
 const no=(text,reason,issuer='nbe')=>{const p=P(text,issuer);eq([p.ok,p.reason],[false,reason],JSON.stringify(text).slice(0,70)+':')};
 
-console.log('\nBank SMS parser (deterministic rules)');
+console.log('\nBank SMS parser - PROVISIONAL rules (test-only wording, switched off in the deployed function)');
 await test('bank card purchase (English + Arabic) → expense; the merchant is kept as written; the balance is never taken as the amount',()=>{
-  const a=fx('card_en'),b=fx('card_ar');eq([a.type,a.amount,b.amount,b.party],['expense',1250.5,250,'كارفور المعادي']);
-  eq(describe(a),{category:'CARREFOUR MAADI',note:'Bank SMS · Card · ref 123456789012'});eq(describe(b),{category:'كارفور المعادي',note:'Bank SMS · Card'})});
+  const a=fx('card_en');eq([a.type,a.amount],['expense',1250.5]);
+  eq(describe(a),{category:'CARREFOUR MAADI',note:'Bank SMS · Card · ref 123456789012'});});
 await test('ATM withdrawal (English + Arabic, Arabic digits) → withdraw',()=>{const a=fx('atm_en'),b=fx('atm_ar');eq([a.type,b.type,b.amount],['withdraw','withdraw',2000]);eq(describe(a),{category:'Withdraw cash',note:'Bank SMS · ATM'})});
 await test('deposit / credit → income; cash paid in at the ATM → deposit',()=>{fx('credit_en');fx('credit_ar');fx('cash_deposit_en');fx('cash_deposit_ar');
   eq(describe(P(M.credit_en.text)),{category:'Add income',note:'From ACME COMPANY · Bank SMS · Bank'});eq(describe(P(M.cash_deposit_en.text)).category,'Cash back to bank')});
 await test('bank transfer sent → expense with the recipient; reference kept',()=>{const a=fx('transfer_en'),b=fx('transfer_ar');eq([a.provider,b.provider,b.party],['bank','bank','محمد علي']);
   eq(describe(a),{category:'MOHAMED ALI',note:'Transfer · Bank SMS · Bank · ref FT26317ABC'})});
-await test('InstaPay sent / received (English + Arabic) → expense / income, provider "instapay"',()=>{for(const k of ['instapay_out_en','instapay_out_ar','instapay_in_en','instapay_in_ar'])eq(fx(k).provider,'instapay');
-  eq(describe(P(M.instapay_in_ar.text)),{category:'Add income',note:'From سارة حسن · Bank SMS · InstaPay · ref 555666777'})});
-await test('Vodafone Cash received / sent (English + Arabic) → income / expense, provider "vodafone_cash"',()=>{for(const k of ['vfcash_in_en','vfcash_in_ar','vfcash_out_en','vfcash_out_ar'])eq(fx(k).provider,'vodafone_cash')});
+await test('InstaPay sent / received (English + Arabic) → expense / income, provider "instapay"',()=>{for(const k of ['instapay_out_en','instapay_in_en'])eq(fx(k).provider,'instapay');
+  eq(describe(P(M.instapay_in_en.text)),{category:'Add income',note:'From SARA HASSAN · Bank SMS · InstaPay · ref 555666777'})});
+await test('Vodafone Cash received / sent (English + Arabic) → income / expense, provider "vodafone_cash"',()=>{for(const k of ['vfcash_in_en','vfcash_out_en','vfcash_out_ar'])eq(fx(k).provider,'vodafone_cash')});
 await test('refund and reversal (English + Arabic) → income marked as refund / reversal',()=>{fx('refund_en');fx('refund_ar');fx('reversal_en');fx('reversal_ar');
   eq(describe(P(M.refund_en.text)),{category:'Add income',note:'Refund · AMAZON EG · Bank SMS · Card'});eq(describe(P(M.reversal_ar.text)).note,'Reversal · NOON · Bank SMS · Card')});
 await test('every rule is exercised by a fixture, and only existing app transaction types are produced',()=>{
-  const used=new Set(FX.messages.map(m=>m.expect.rule));eq(RULES.map(r=>r.id).filter(id=>!used.has(id)),[]);
+  const used=new Set([...FX.messages,...FX.real_messages].map(m=>m.expect.rule));eq(RULES.map(r=>r.id).filter(id=>!used.has(id)),[]);
   eq([...new Set(RULES.map(r=>r.type))].sort(),['deposit','expense','income','withdraw']);eq(new Set(RULES.map(r=>r.id)).size,RULES.length);
-  for(const m of FX.messages)eq(P(m.text,null),{ok:true,...m.expect},m.id+' (no issuer filter: still exactly one kind)')});
+  for(const m of FX.messages)eq(P(m.text,null),{ok:true,...m.expect},m.id+' (no issuer filter: still exactly one kind)');
+  for(const m of FX.messages)eq(parseSms(m.text,{issuer:m.issuer,now:NOW}).reason,'no_rule_matched',m.id+': a provisional message is NOT recognised by the deployed rule set')});
 await test('unknown SMS → not recognised: advert, balance enquiry, plain text with an amount, limit change',()=>{
   no('Enjoy 20% cashback up to EGP 500 when you shop online with your card this weekend!','no_rule_matched');
   no('Your available balance is EGP 12,345.67 as of 12/11/2026','no_rule_matched');no('EGP 250.00 transaction transfer LE 250','no_rule_matched');
@@ -47,14 +51,14 @@ await test('amounts: comma-separated, decimal, plain, EGP / LE / L.E. / جنيه
   eq(['1,250.50','2000','0.50','12,345,678.9','1000000','7'].map(parseAmount),[1250.5,2000,0.5,12345678.9,1000000,7]);
   const card=m=>P(`Your card ending 1234 was charged ${m} at SHOP on 12/11/2026`).amount;
   eq(['EGP 1,250.50','EGP1250.5','1,250.50 EGP','LE 1250.50','L.E. 1,250.50','1250.50 L.E'].map(card),[1250.5,1250.5,1250.5,1250.5,1250.5,1250.5]);
-  const ar=m=>P(`تم خصم ${m} من بطاقتكم رقم 1234 لدى متجر`).amount;
-  eq(['250.75 جنيه','٢٥٠٫٧٥ جنيه','١٬٢٥٠٫٥٠ جنيها','1250.5 ج.م','جنيه 99','3,000 جنيه مصري'].map(ar),[250.75,250.75,1250.5,1250.5,99,3000])});
+  const ar=m=>PR(R.real_debit_card.text.replace('200 EGP',m),'nbe').amount;
+  eq(['250.75 جنيه','٢٥٠٫٧٥ جنيه','١٬٢٥٠٫٥٠ جنيها','1250.5 ج.م','3,000 جم','99EGP','7 L.E'].map(ar),[250.75,250.75,1250.5,1250.5,3000,99,7])});
 await test('malformed / ambiguous amount → not recognised (never "repaired"); foreign currency → not recognised (never converted)',()=>{
   eq(['1,50','1.500','12,34,567','1,2345','1..5','.5','5.','abc','','0','-5','1 250','1e3'].map(parseAmount),Array(13).fill(null));
   for(const m of ['EGP 1,25.0','EGP 12,34,567','EGP 1.500','EGP 1,250.505'])no(`Your card ending 1234 was charged ${m} at SHOP on 12/11/2026`,'amount_malformed');
   no('Your card ending 1234 was charged at SHOP on 12/11/2026. Available balance EGP 900.00','amount_not_found');
   no('Your card ending 1234 was charged USD 20.00 at AMAZON US on 12/11/2026. Available balance EGP 900.00','unsupported_currency');
-  no('تم خصم 20.00 دولار من بطاقتكم رقم 1234 لدى AMAZON','unsupported_currency')});
+  nor(R.real_debit_card.text.replace('200 EGP','20.00 USD'),'structure_mismatch','nbe');nor(R.real_instapay_out.text.replace('1.00 جم','1.00 دولار'),'structure_mismatch','nbe')});
 await test('date/time: day/month order, Cairo time incl. summer time, am/pm, 2-digit year, month names, ISO; date only → noon; no date → receipt time',()=>{
   const at=(tail,now=NOW)=>{const p=P(`Your card ending 1234 was charged EGP 10.00 at SHOP ${tail}`,'nbe',now);return p.ok?[p.at,p.date_source]:p.reason};
   eq(at('on 12/11/2026 14:35'),['2026-11-12T12:35:00.000Z','sms']);eq(at('on 05/11/2026 at 09:05:30'),['2026-11-05T07:05:30.000Z','sms']);
@@ -70,11 +74,13 @@ await test('malformed date → not recognised: impossible day/month/time, two di
   eq(['on 32/11/2026','on 12/13/2026','on 31/02/2026','on 00/11/2026','on 12/11/2026 25:10','on 12/11/2026 10:75','on 12/11/2026 13:10 pm'].map(r),Array(7).fill('date_malformed'));
   eq(r('on 12/11/2026, posted 13/11/2026'),'date_ambiguous');eq(r('on 12/11/2027'),'date_in_future');eq(r('on 12/11/2019'),'date_too_old');eq(r('on 01/06/2026'),'date_too_old')});
 await test('Arabic text is matched regardless of hamza / diacritics / tatweel / invisible marks; names come back exactly as written',()=>{
-  const p=P('تمّ خصم مبلغ 80 جنيهاً من بطاقتكم رقم 1234 لدى \u200fمطعم أبو أحمد\u200f بتاريخ 12/11/2026');eq([p.ok,p.amount,p.party,p.rule],[true,80,'مطعم أبو أحمد','nbe.card_purchase.ar']);
-  eq(P('تم خصم 80 جنيه من بطاقتكم لدي مطعم ابو احمد').rule,'nbe.card_purchase.ar');eq(foldSms('إلى الآلي ABC').length,'إلى الآلي ABC'.length);eq(cleanSms('  a \n\t b  '),'a b')});
+  const t=R.real_instapay_in.text,base=PR(t,'nbe');
+  const p=PR(t.replace('تم إضافة','تمّ إضـافة').replace('من عبير','من \u200fعبير').replace('قداح رقم','قداح\u200f رقم'),'nbe');eq(p,base,'diacritics, tatweel, direction marks');eq(p.party,'عبير على زين العابدين القصبى قداح','the name keeps its own spelling');
+  eq(PR(t.replace('إضافة','اضافة'),'nbe'),base,'hamza or not');eq(PR(R.real_instapay_out.text.replace('إلى','الى'),'nbe').amount,1);
+  eq(foldSms('إلى الآلي ABC').length,'إلى الآلي ABC'.length);eq(cleanSms('  a \n\t b  '),'a b')});
 await test('providers are not confused: InstaPay ≠ Vodafone Cash ≠ plain bank transfer; a currency or a keyword alone decides nothing',()=>{
-  for(const k of ['instapay_out_en','instapay_out_ar','instapay_in_en','instapay_in_ar'])eq(P(M[k].text,'vodafone_cash').reason,'no_rule_matched',k+' with a Vodafone Cash key');
-  for(const k of ['vfcash_in_en','vfcash_in_ar','vfcash_out_en','vfcash_out_ar'])eq(P(M[k].text,'nbe').reason,'no_rule_matched',k+' with a bank key');
+  for(const k of ['instapay_out_en','instapay_in_en'])eq(P(M[k].text,'vodafone_cash').reason,'no_rule_matched',k+' with a Vodafone Cash key');
+  for(const k of ['vfcash_in_en','vfcash_out_en','vfcash_out_ar'])eq(P(M[k].text,'nbe').reason,'no_rule_matched',k+' with a bank key');
   eq([P(M.transfer_en.text).provider,P(M.transfer_ar.text).provider],['bank','bank'],'a transfer without InstaPay wording is never "instapay"');
   eq(P(M.transfer_en.text.replace('A transfer','An InstaPay transfer')).provider,'instapay');
   eq(P('InstaPay: you received EGP 300.00 in your Vodafone Cash wallet from SARA','nbe').ok,false,'InstaPay + Vodafone Cash wording together → nobody claims it');
@@ -87,14 +93,71 @@ await test('similar wording, different meaning → the right kind or nothing: AT
   eq(P('Refund of EGP 120.00 for reversed transaction at NOON').reason,'no_rule_matched','refund + reversal wording together');
   eq(P('InstaPay: EGP 100.00 was sent and EGP 50.00 received on your account').reason,'no_rule_matched');
   const mixed=P('Your card ending 1234 was charged EGP 100.00 at SHOP. تم سحب نقدي بمبلغ 100 جنيه من ماكينة الصراف');eq([mixed.reason,mixed.rules],['ambiguous_message',['nbe.card_purchase.en','nbe.atm_withdrawal.ar']]);
-  eq(P('Your card ending 1234 was charged EGP 100.00 at SHOP. تم خصم 150 جنيه من بطاقتكم لدى SHOP').reason,'ambiguous_amount','same kind twice with different amounts');
-  eq(P('Your card ending 1234 was charged EGP 100.00 at SHOP. تم خصم 100 جنيه من بطاقتكم لدى SHOP').amount,100)});
+  const both=P('Your card ending 1234 was charged EGP 100.00 at SHOP. '+R.real_debit_card.text);eq([both.ok,both.reason],[false,'ambiguous_message'],'a provisional and a verified rule both claim it → nobody gets it')});
 await test('sender names: known families only; l / I look-alikes are the same sender; fingerprint ignores spacing and digit style',async()=>{
   eq(['BanK-AIAhly','BanK-AlAhly','bank-aiahly','BANK ALAHLY','NBE','VF-Cash','CIB','','AlAhly'].map(issuerOf),['nbe','nbe','nbe','nbe','nbe','vodafone_cash',null,null,null]);
   ok(SENDERS.nbe.includes('BanK-AIAhly'));eq(normSender('BanK-AIAhly'),normSender('BanK-AlAhly'));
-  const t=M.card_ar.text,p=P(t),f=await fingerprint(p,t);eq(f,await fingerprint(p,'  '+t.replace(/ /g,'  ').replace('250.00','٢٥٠.٠٠')+'\n'));ok(/^[0-9a-f]{64}$/.test(f.fingerprint)&&/^[0-9a-f]{64}$/.test(f.sms_hash));
+  const t=R.real_debit_card.text,p=PR(t,'nbe'),f=await fingerprint(p,t);eq(f,await fingerprint(p,'  '+t.replace(/ /g,'  ').replace('200 EGP','٢٠٠ EGP').replace('2521','٢٥٢١')+'\n'));ok(/^[0-9a-f]{64}$/.test(f.fingerprint)&&/^[0-9a-f]{64}$/.test(f.sms_hash));
   const a=P(M.card_en.text),fa=await fingerprint(a,M.card_en.text);eq(fa.fingerprint,(await fingerprint(a,'completely different wording')).fingerprint,'with a bank reference the reference decides');
   ok(fa.fingerprint!==(await fingerprint({...a,reference:'999'},M.card_en.text)).fingerprint);ok(fa.fingerprint!==(await fingerprint({...a,amount:1},M.card_en.text)).fingerprint)});
+
+console.log('\nBank SMS parser - VERIFIED rules (real production messages)');
+const rx=id=>{const m=R[id],p=PR(m.text,m.issuer);eq(p,{ok:true,...m.expect},id+':');eq(describe(p),m.describe,id+' description:');return p};
+await test('REAL InstaPay outgoing → expense 1.00, provider instapay, masked recipient kept, reference 456611434599, "11-12 17:24" = 12 Nov 17:24 Cairo, جم = EGP',()=>{
+  const p=rx('real_instapay_out');eq([p.type,p.amount,p.provider,p.reference,p.at],['expense',1,'instapay','456611434599','2026-11-12T15:24:00.000Z'])});
+await test('REAL InstaPay incoming → income 205.00, provider instapay, sender name (with "على" inside) kept whole, reference 467579444840',()=>{
+  const p=rx('real_instapay_in');eq([p.type,p.amount,p.party,p.reference],['income',205,'عبير على زين العابدين القصبى قداح','467579444840'])});
+await test('REAL debit card purchase → expense 200 (not the available 11.31), merchant "Mansoura Market 2 D" (spaces normalised), date 12/11/26 21:43, Arabic-Indic hotline digits harmless',()=>{
+  const p=rx('real_debit_card');eq([p.type,p.amount,p.provider,p.party,p.at,p.reference],['expense',200,'debit_card','Mansoura Market 2 D','2026-11-12T19:43:00.000Z',''])});
+await test('REAL Vodafone Cash incoming → income 1.00 (not the balance 6.93, not a phone number), name kept, phone NOT kept, reference 025712695852, "17:21 26-11-12" parsed',()=>{
+  const p=rx('real_vfcash_in');eq([p.type,p.amount,p.provider,p.reference,p.at],['income',1,'vodafone_cash','025712695852','2026-11-12T15:21:00.000Z']);
+  ok(!JSON.stringify([p,describe(p)]).includes('01095872700'),'the phone number is not part of the result')});
+await test('REAL Vodafone Cash mobile recharge → expense 30 (the amount after "وخصم"; not the balance 4.93, not the advert\'s 100ج), described as Vodafone Cash mobile recharge, receipt time',()=>{
+  const p=rx('real_vfcash_recharge');eq([p.type,p.amount,p.kind,p.date_source,describe(p).category],['expense',30,'mobile_recharge','received','Vodafone Cash mobile recharge']);
+  eq(PR(R.real_vfcash_recharge.text.replace('وخصم 30','وخصم 31.5'),'vodafone_cash').amount,31.5,'the amount is what left the wallet')});
+await test('the five real messages give the same result with or without issuer filter and with the provisional rules on; each is claimed by exactly one rule',()=>{
+  for(const m of FX.real_messages)for(const o of [{},{provisional:true},{issuer:m.issuer,provisional:true}])eq(parseSms(m.text,{now:RNOW,...o}),{ok:true,...m.expect},m.id+JSON.stringify(o));
+  eq(VERIFIED_RULES.map(r=>r.id),['nbe.instapay_out.ar','nbe.instapay_in.ar','nbe.debit_card_purchase.ar','vfc.received.ar','vfc.mobile_recharge.ar']);ok(VERIFIED_RULES.every(r=>r.shape&&!r.provisional)&&PROVISIONAL_RULES.every(r=>r.provisional&&!r.shape));
+  for(const m of FX.real_messages)eq(PR(m.text,m.issuer==='nbe'?'vodafone_cash':'nbe').reason,'no_rule_matched',m.id+' with the other provider\'s key')});
+await test('NEGATIVE balance: the available / current balance is never the amount - if the transaction amount is missing nothing is recognised',()=>{
+  const c=R.real_debit_card.text,v=R.real_vfcash_in.text,g=R.real_vfcash_recharge.text;
+  eq([PR(c,'nbe').amount,PR(v,'vodafone_cash').amount,PR(g,'vodafone_cash').amount],[200,1,30]);
+  nor(c.replace('تم خصم 200 EGP','تم خصم'),'structure_mismatch','nbe');nor(c.replace('200 EGP ',''),'structure_mismatch','nbe');
+  nor(v.replace('مبلغ 1.00 جنيه','مبلغ'),'structure_mismatch','vodafone_cash');nor(g.replace('وخصم 30 من محفظتك','من محفظتك'),'structure_mismatch','vodafone_cash');
+  eq(PR(c.replace('المتاح11.31EGP','المتاح99,999.99EGP'),'nbe').amount,200);eq(PR(v.replace('6.93','5000'),'vodafone_cash').amount,1);eq(PR(g.replace('4.93','900'),'vodafone_cash').amount,30);
+  nor('رصيد حسابك في فودافون كاش الحالي 4.93 جنيه','no_rule_matched','vodafone_cash');nor('المتاح11.31EGP للمزيد اتصل ب ١٩٦٢٣ البنك الاهلي','no_rule_matched','nbe')});
+await test('NEGATIVE phone numbers: a wallet / phone number is never the amount and never the description',()=>{
+  const v=R.real_vfcash_in.text;nor(v.replace('مبلغ 1.00 جنيه من','مبلغ من'),'structure_mismatch','vodafone_cash');nor(v.replace('1.00 جنيه','01095872700'),'structure_mismatch','vodafone_cash');
+  const noName=PR(v.replace('\nالمسجل بإسم محمد اسامه احمد علي حسنين',''),'vodafone_cash');eq([noName.ok,noName.amount,noName.party,describe(noName)],[true,1,'',{category:'Add income',note:'Bank SMS · Vodafone Cash · ref 025712695852'}],'no registered name → no description from the phone number');
+  nor('للمزيد اتصل بـ 19623 او 01095872700 فودافون كاش محفظتك','no_rule_matched','vodafone_cash')});
+await test('NEGATIVE reference numbers / account / card / hotline numbers: never the amount',()=>{
+  const o=R.real_instapay_out.text,i=R.real_instapay_in.text;
+  nor(o.replace('بمبلغ 1.00 جم ',''),'structure_mismatch','nbe');nor(i.replace('بمبلغ 205.00 جم ',''),'structure_mismatch','nbe');nor(o.replace('1.00 جم','جم'),'structure_mismatch','nbe');
+  eq([PR(o,'nbe').amount,PR(i,'nbe').amount],[1,205]);eq(PR(o.replace('0170','999999'),'nbe').amount,1);eq(PR(R.real_debit_card.text.replace('رقم2521','رقم9999'),'nbe').amount,200);
+  nor(o.replace('رقم مرجعي 456611434599 ',''),'structure_mismatch','nbe');nor(R.real_vfcash_in.text.replace('رقم العملية: 025712695852','رقم العملية:'),'structure_mismatch','vodafone_cash')});
+await test('NEGATIVE promotional amounts: an advert is never a transaction, and the advert inside a real message is never its amount',()=>{
+  const g=R.real_vfcash_recharge.text;eq(PR(g.replace('100ج','5000ج'),'vodafone_cash').amount,30);
+  nor('حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer','no_rule_matched','vodafone_cash');
+  nor('اشحن رصيدك من فودافون كاش ب 30 جنيه واكسب 100ج كاش باك من محفظتك','no_rule_matched','vodafone_cash');
+  nor('تم شحن رصيد موبايلك ب 30 بنجاح. هيجيلك لحد 100ج كاش باك من محفظتك في فودافون كاش','structure_mismatch','vodafone_cash');
+  nor('استخدم بطاقة الخصم المباشر عند Mansoura Market واحصل على خصم 200 EGP','no_rule_matched','nbe')});
+await test('NEGATIVE unrelated / ambiguous / altered messages → unrecognised: two messages glued together, changed wording, other card type, declined, one-time code',()=>{
+  const o=R.real_instapay_out.text,i=R.real_instapay_in.text,c=R.real_debit_card.text;
+  nor(o+' '+i,'no_rule_matched','nbe');nor(c+' '+o,'no_rule_matched','nbe');nor(R.real_vfcash_in.text+' '+R.real_vfcash_recharge.text,'no_rule_matched','vodafone_cash');
+  nor(c.replace('بطاقة الخصم المباشر','بطاقة الائتمان'),'no_rule_matched','nbe');nor(c.replace('تم خصم','تم رفض خصم'),'declined_or_failed','nbe');nor(o.replace('تم تنفيذ','لم يتم تنفيذ'),'declined_or_failed','nbe');
+  nor(o.replace('إلى','الى حساب خارجي لصالح').replace('رقم مرجعي','مرجع'),'structure_mismatch','nbe');nor(i.replace('بمبلغ','قيمته'),'structure_mismatch','nbe');
+  nor('رمز التحقق 123456 لتنفيذ تحويل لحظي من حسابكم بمبلغ 1.00 جم','one_time_code','nbe');
+  nor('عزيزي العميل تحويل لحظي متاح الان من حسابكم عبر تطبيق انستاباي بحد اقصى 70000 جم','no_rule_matched','nbe');
+  nor('EGP 200 جم جنيه تحويل transaction','no_rule_matched','nbe');nor('تم خصم 200 EGP','malformed_message','nbe');nor('تم خصم 200 EGP من الحساب بنجاح','no_rule_matched','nbe')});
+await test('real formats: amounts with separators / decimals, Arabic-Indic digits everywhere, malformed amount or date → unrecognised; year roll-over of "MM-DD"',()=>{
+  const o=R.real_instapay_out.text,c=R.real_debit_card.text,v=R.real_vfcash_in.text;
+  eq(['1,250.00','12500.5','0.75','1,000,000'].map(a=>PR(o.replace('1.00 جم',a+' جم'),'nbe').amount),[1250,12500.5,0.75,1000000]);eq(PR(o.replace('1.00 جم','1.00 جنيه'),'nbe').amount,1);eq(PR(c.replace('200 EGP','1,200.50 EGP'),'nbe').amount,1200.5);
+  for(const a of ['1,25','1.500','12,34,567','1..5'])nor(o.replace('1.00 جم',a+' جم'),'amount_malformed','nbe');
+  const ar=t=>t.replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);eq(PR(ar(o),'nbe'),PR(o,'nbe'));eq(PR(ar(c).replace('Mansoura Market ٢','Mansoura Market 2'),'nbe'),PR(c,'nbe'));eq(PR(ar(v).replace(/http\S+/,''),'vodafone_cash'),PR(v,'vodafone_cash'));
+  nor(o.replace('يوم 11-12','يوم 13-12'),'date_malformed','nbe');nor(o.replace('يوم 11-12','يوم 02-30'),'date_malformed','nbe');nor(o.replace('17:24','25:24'),'date_malformed','nbe');
+  nor(c.replace('12/11/26','32/11/26'),'date_malformed','nbe');nor(c.replace('12/11/26','12/11/27'),'date_in_future','nbe');nor(v.replace('26-11-12','26-13-12'),'date_malformed','vodafone_cash');nor(v.replace('26-11-12','25-11-12'),'date_too_old','vodafone_cash');
+  eq(PR(o.replace('يوم 11-12 الساعة 17:24','يوم 12-31 الساعة 23:50'),'nbe',Date.parse('2027-01-01T06:00:00Z')).at,'2026-12-31T21:50:00.000Z','31 December read on 1 January');
+  eq(PR(o.replace('يوم 11-12','يوم 11-05'),'nbe').at,'2026-11-05T15:24:00.000Z','MONTH-DAY, not day-month')});
 
 /* ================================================= with the database ================================================= */
 console.log('\nBank SMS import (real PostgreSQL + real Edge Functions)');
@@ -102,7 +165,8 @@ const db=await startDb();const {admin,as}=db;
 const one=async(uid,sql,p)=>(await as(uid,sql,p)).rows[0];
 const user=async name=>(await admin.query('insert into auth.users(email,raw_user_meta_data) values($1,$2) returning id',[name+'@t.io',{name}])).rows[0].id;
 const sub=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
-const ENV={SUPABASE_URL:'https://proj.supabase.co',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service-secret',ONESIGNAL_REST_API_KEY:'os_v2_app_testkey'};
+const PROD={SUPABASE_URL:'https://proj.supabase.co',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service-secret',ONESIGNAL_REST_API_KEY:'os_v2_app_testkey'};   // the deployed configuration
+const ENV={...PROD,BANK_SMS_PROVISIONAL_RULES:'on'};                                             // test-only: also the provisional rules
 const J=(status,body)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}});
 const sent=[],world={notifyDown:false,loseReply:false,authCalls:0,notifyCalls:[]};
 const ARGS={bank_import_auth:a=>['select bank_import_auth($1) v',[a.kh]],bank_import_commit:a=>['select bank_import_commit($1,$2,$3) v',[a.kh,JSON.stringify(a.p),!!a.dry]],
@@ -116,7 +180,7 @@ async function fakeFetch(url,init={}){
       return new Response(r===null||r===''?'':JSON.stringify(r),{status:200})}
     catch(e){await c.query('rollback').catch(()=>{});if(e.message==='connection reset')throw e;return J(400,{message:e.message})}finally{await c.end()}}
   if(url.endsWith('/functions/v1/notify-transactions')){world.notifyCalls.push(JSON.parse(init.body));if(world.notifyDown)throw new Error('function unreachable');
-    return notifyHandle(new Request(url,{method:'POST',headers:h,body:init.body}),ENV,fakeFetch)}
+    return notifyHandle(new Request(url,{method:'POST',headers:h,body:init.body}),PROD,fakeFetch)}
   if(url.endsWith('/auth/v1/user')){world.authCalls++;const m=/^Bearer user:(.+)$/.exec(String(h.Authorization||''));return m?J(200,{id:m[1]}):J(401,{msg:'invalid JWT'})}
   if(url==='https://api.onesignal.com/notifications'){sent.push(JSON.parse(init.body));return J(200,{id:'n1'})}
   throw new Error('unexpected request '+url)}
@@ -183,9 +247,9 @@ try{
     eq(await count(A),n)});
   await test('forged user id / household id / wallet ids in the request are ignored: the entry goes to the key owner\'s own household and bank wallet',async()=>{
     const nA=await count(A),bA=await bal(Ahmed,A);
-    const r=await post(kB,{sender:'BanK-AIAhly',text:sms('card_ar'),user_id:Ahmed,household_id:A,wallet_id:WA['Household cash'],to_wallet_id:WA['Bank account'],type:'income',amount:999999,key_id:'x'});
-    eq([r.http,r.status,r.type,r.amount,r.wallet],[200,'imported','expense',250,'Bank account']);
-    const t=(await txs(B)).pop();eq([t.user_id,t.household_id,t.wallet,t.type,t.amount],[Bob,B,'Bank account','expense',250]);
+    const r=await post(kB,{sender:'BanK-AIAhly',text:sms('transfer_ar'),user_id:Ahmed,household_id:A,wallet_id:WA['Household cash'],to_wallet_id:WA['Bank account'],type:'income',amount:999999,key_id:'x'});
+    eq([r.http,r.status,r.type,r.amount,r.wallet],[200,'imported','expense',500,'Bank account']);
+    const t=(await txs(B)).pop();eq([t.user_id,t.household_id,t.wallet,t.type,t.amount],[Bob,B,'Bank account','expense',500]);
     eq([await count(A),await bal(Ahmed,A)],[nA,bA],'household A is untouched');eq((await as(Ahmed,'select * from bank_imports')).rows.length,0,'A cannot even see B\'s import record')});
   await test('sender / provider not allowed for this key → refused: wrong sender, unknown bank, Vodafone Cash message on a bank key',async()=>{
     const n=await count(A);
@@ -226,8 +290,8 @@ try{
     b=await bal(Ahmed,A);eq([b['Bank account'],b['Household cash']],[b0['Bank account']+1000,b0['Household cash']-1000])});
   await test('credit / InstaPay received / refund → income on the bank wallet; bank transfer / InstaPay sent → expense; descriptions keep the names',async()=>{
     const b0=await bal(Ahmed,A);const got=[];
-    for(const id of ['credit_en','instapay_in_ar','refund_en','transfer_ar','instapay_out_en']){const r=await imp(kA,id);eq(r.status,'imported',id);const t=(await txs(A)).pop();got.push([t.type,t.amount,t.wallet,t.category,t.note])}
-    eq(got,[['income',15000,'Bank account','Add income','From ACME COMPANY · Bank SMS · Bank'],['income',300,'Bank account','Add income','From سارة حسن · Bank SMS · InstaPay · ref 555666777'],
+    for(const id of ['credit_en','instapay_in_en','refund_en','transfer_ar','instapay_out_en']){const r=await imp(kA,id);eq(r.status,'imported',id);const t=(await txs(A)).pop();got.push([t.type,t.amount,t.wallet,t.category,t.note])}
+    eq(got,[['income',15000,'Bank account','Add income','From ACME COMPANY · Bank SMS · Bank'],['income',300,'Bank account','Add income','From SARA HASSAN · Bank SMS · InstaPay · ref 555666777'],
       ['income',120,'Bank account','Add income','Refund · AMAZON EG · Bank SMS · Card'],['expense',500,'Bank account','محمد علي','Transfer · Bank SMS · Bank · ref 778899'],['expense',750,'Bank account','ahmed@instapay','Transfer · Bank SMS · InstaPay · ref 987654321']]);
     eq((await bal(Ahmed,A))['Bank account'],b0['Bank account']+15000+300+120-500-750);
     eq((await one(Ahmed,"select range_stats($1,(now() at time zone 'Africa/Cairo')::date-3,(now() at time zone 'Africa/Cairo')::date) s",[A])).s.by_member[0].name,'Ahmed','counted in the normal statistics under the key owner')});
@@ -312,10 +376,48 @@ try{
     sent.length=0;const t=(await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'expense',3,'Gum',''])).rows[0].id;
     const r=await nf({Authorization:'Bearer user:'+Bob,apikey:'anon'},{on_behalf_of:Ahmed});eq([r.http,r.claimed,sent.length],[200,0,0],'on_behalf_of from a browser session is ignored');eq((await outbox(t)).status,'pending')});
 
+  console.log('\nReal production messages through the deployed configuration');
+  const postReal=(key,m,extra={})=>quiet(async()=>{const r=await handle(new Request('https://proj.supabase.co/functions/v1/bank-sms-import',{method:'POST',headers:{Authorization:'Bearer '+key},body:JSON.stringify({sender:m.sender,text:m.text,...extra})}),PROD,fakeFetch,RNOW);return{http:r.status,...(await r.json())}});
+  let kVF;
+  await test('the five real messages become the right normal transactions (type, amount, wallet, balance, description, SMS time, source record) and feed the outbox',async()=>{
+    kVF=(await newKey(Ahmed,'VF-Cash',WA['Personal cash'],WA['Household cash'])).key;await as(Ahmed,INS,[A,Ahmed,WA['Personal cash'],null,'income',100,'Add income','']);await admin.query("update notification_outbox set status='sent',done_at=now() where status<>'sent'");
+    const b0=await bal(Ahmed,A),n=await count(A),got=[];sent.length=0;
+    for(const id of ['real_instapay_out','real_instapay_in','real_debit_card','real_vfcash_in','real_vfcash_recharge']){const m=R[id],r=await postReal(m.issuer==='nbe'?kA:kVF,m);eq([r.http,r.status,r.notification],[200,'imported','triggered'],id);
+      const t=(await txs(A)).pop();eq(t.id,r.transaction_id);got.push([t.type,t.amount,t.wallet,t.category,t.note,t.user_id===Ahmed,m.expect.date_source==='received'||t.created_at.toISOString()===m.expect.at]);
+      const o=await outbox(t.id);eq(o.status,'sent',id+' outbox');const i=(await imports(A)).pop();eq([i.transaction_id,i.provider,i.rule,i.reference],[t.id,m.expect.provider,m.expect.rule,m.expect.reference||null])}
+    eq(got,[['expense',1,'Bank account','محمد ا**** ا*** ع** ح**** ا******','Transfer · Bank SMS · InstaPay · ref 456611434599',true,true],
+      ['income',205,'Bank account','Add income','From عبير على زين العابدين القصبى قداح · Bank SMS · InstaPay · ref 467579444840',true,true],
+      ['expense',200,'Bank account','Mansoura Market 2 D','Bank SMS · Debit card',true,true],
+      ['income',1,'Personal cash','Add income','From محمد اسامه احمد علي حسنين · Bank SMS · Vodafone Cash · ref 025712695852',true,true],
+      ['expense',30,'Personal cash','Vodafone Cash mobile recharge','Bank SMS · Vodafone Cash',true,true]]);
+    const b1=await bal(Ahmed,A);eq([b1['Bank account'],b1['Personal cash'],b1['Household cash']],[b0['Bank account']-1+205-200,b0['Personal cash']+1-30,b0['Household cash']]);eq(await count(A),n+5);
+    eq(sent.length,5);ok(sent.every(x=>JSON.stringify(x.include_subscription_ids)===JSON.stringify([sub(3)])),'each one notified the other member only');
+    const dump=JSON.stringify([await imports(A),await txs(A)]);ok(!dump.includes('01095872700'),'the phone number is stored nowhere');ok(!dump.includes('المتاح')&&!dump.includes('كاش باك')&&!dump.includes('19623'),'the SMS text is stored nowhere')});
+  await test('resending each real message (once, ten times, with different spacing / digit style) → already_imported, still one transaction each, no new notification',async()=>{
+    const n=await count(A);sent.length=0;
+    for(const id of ['real_instapay_out','real_instapay_in','real_debit_card','real_vfcash_in','real_vfcash_recharge']){const m=R[id],k=m.issuer==='nbe'?kA:kVF;
+      const first=await postReal(k,m);eq([first.http,first.ok,first.status],[200,true,'already_imported'],id);ok(first.transaction_id);
+      const rs=await Promise.all(Array.from({length:10},()=>postReal(k,m)));eq(rs.map(x=>x.status),Array(10).fill('already_imported'),id+' x10');
+      eq((await postReal(k,{...m,text:'  '+m.text.replace(/ /g,'  ')+' \n'})).status,'already_imported',id+' spacing');eq((await postReal(k,m,{dry_run:true})).status,'already_imported',id+' dry run')}
+    eq((await postReal(kA,{...R.real_instapay_out,text:R.real_instapay_out.text.replace('للمزيد اتصل بـ 19623','')})).status,'already_imported','same bank reference, different tail');
+    eq([await count(A),sent.length],[n,0])});
+  await test('a different transaction is not swallowed: another reference / another balance after an identical purchase → imported; wrong key family → refused',async()=>{
+    const n=await count(A);
+    eq((await postReal(kA,{...R.real_instapay_out,text:R.real_instapay_out.text.replace('456611434599','456611434600')})).status,'imported');
+    eq((await postReal(kVF,{...R.real_vfcash_recharge,text:R.real_vfcash_recharge.text.replace('4.93','0.93').replace('وخصم 30','وخصم 4').replace('ب 30','ب 4')})).status,'imported','second recharge: the balance differs, so the message differs');
+    eq(await postReal(kA,{...R.real_vfcash_in,sender:'BanK-AIAhly'}),{http:422,ok:false,status:'unrecognized_sms',reason:'no_rule_matched'});eq((await postReal(kA,R.real_vfcash_in)).status,'sender_not_allowed');eq((await postReal(kVF,R.real_debit_card)).status,'sender_not_allowed');
+    eq(await count(A),n+2)});
+  await test('deployed configuration: provisional (unverified) wording is refused - nothing is created; altered / ambiguous real messages are refused too',async()=>{
+    const n=await count(A);
+    for(const m of FX.messages.filter(m=>m.issuer==='nbe')){const r=await postReal(kA,{sender:'BanK-AIAhly',text:m.text});eq([r.http,r.status,r.reason],[422,'unrecognized_sms','no_rule_matched'],m.id)}
+    eq((await postReal(kA,{...R.real_debit_card,text:R.real_debit_card.text.replace('تم خصم 200 EGP','تم خصم')})).reason,'structure_mismatch');
+    eq((await postReal(kA,{...R.real_instapay_out,text:R.real_instapay_out.text+' '+R.real_instapay_in.text})).status,'unrecognized_sms');
+    eq((await postReal(kVF,{...R.real_vfcash_recharge,text:'حول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك'})).status,'unrecognized_sms');eq(await count(A),n)});
+
   console.log('\nLogging and clean-up');
   await test('logs: outcome, rule, reason and hashed identifiers only - never the SMS text, a name, a key or the service key',async()=>{
     const all=logs.join('\n');ok(logs.length>40,'something was logged');
-    for(const s of ['CARREFOUR','كارفور','MOHAMED','ahmed@instapay','SEOUDI','Available balance','card ending',kA,kB,kMona,'service-secret','os_v2_app_testkey','123456789012'])ok(!all.includes(s),'log leaks: '+s.slice(0,12));
+    for(const s of ['CARREFOUR','Mansoura','عبير','حسنين','01095872700','456611434599','025712695852','MOHAMED','ahmed@instapay','SEOUDI','Available balance','card ending',kA,kB,kMona,'service-secret','os_v2_app_testkey','123456789012'])ok(!all.includes(s),'log leaks: '+s.slice(0,12));
     ok(/"status":"imported".*"rule":"nbe\.card_purchase\.en"/.test(all)&&/"status":"already_imported"/.test(all)&&/"status":"unrecognized_sms","reason":"no_rule_matched"/.test(all)&&/"status":"unauthorized","reason":"missing_key"/.test(all))});
   await test('responses never contain keys, hashes, user ids or internal errors',async()=>{
     const r=await imp(kA,'Refund of EGP 2.00 from KIOSK to your card ending 1234 on '+YD.txt+'. Ref 20002000');const s=JSON.stringify(r);
@@ -323,9 +425,9 @@ try{
     const bad=await quiet(async()=>{const x=await handle(new Request('https://x/f',{method:'POST',headers:{Authorization:'Bearer '+kA},body:'{}'}),{SUPABASE_URL:'https://proj.supabase.co'},fakeFetch);return{http:x.status,...(await x.json())}});eq(bad,{http:500,ok:false,status:'error'})});
   await test('account deletion and household deletion still work with keys and import records present',async()=>{
     const Sam=await user('Sam'),S=(await one(Sam,"select create_household('Home S') h")).h;const sw=(await admin.query("select id from wallets where household_id=$1 and name='Bank account'",[S])).rows[0].id;
-    await as(Sam,INS,[S,Sam,sw,null,'income',500,'Add income','']);const k=(await newKey(Sam)).key;eq((await imp(k,'card_ar')).status,'imported');
+    await as(Sam,INS,[S,Sam,sw,null,'income',500,'Add income','']);const k=(await newKey(Sam)).key;eq((await imp(k,'transfer_ar')).status,'imported');
     await as(Sam,"select delete_my_account('DELETE')");eq((await admin.query('select (select count(*) from bank_import_keys where household_id=$1)::int k,(select count(*) from bank_imports where household_id=$1)::int i,(select count(*) from households where id=$1)::int h',[S])).rows[0],{k:0,i:0,h:0});
-    eq(await imp(k,'card_ar'),{http:401,ok:false,status:'unauthorized'});
+    eq(await imp(k,'transfer_ar'),{http:401,ok:false,status:'unauthorized'});
     await as(Mona,"select delete_my_account('DELETE')");eq(await imp(kMona,'card_en'),{http:401,ok:false,status:'unauthorized'});
     eq(+(await admin.query('select count(*) n from bank_imports where household_id=$1 and transaction_id=$2',[A,cardTx])).rows[0].n,1,'the household\'s records stay')});
 }catch(e){console.log=_log;console.error=_err;console.log('FATAL',e);process.exitCode=1}

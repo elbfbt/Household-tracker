@@ -8,7 +8,7 @@
 //
 // * The import key decides the user, the household and the wallets. Nothing in the request body can change them
 //   (user_id / household_id / wallet_id fields are never read).
-// * The parser is a list of provider- and type-specific RULES (see RULES below). No AI, no guessing: if not exactly
+// * The parser is a list of provider- and type-specific RULES (see VERIFIED_RULES below). No AI, no guessing: if not exactly
 //   one kind of transaction is recognised, or the amount / date is not clean, nothing is created (unrecognized_sms).
 // * The same bank transaction can only ever be recorded once (fingerprint, unique in the database).
 // * This function does not talk to OneSignal. After an import it only asks the existing notify-transactions
@@ -101,6 +101,21 @@ export function findDate(fold, now) {
   return { at, source: time ? 'sms' : 'sms_date_only' };
 }
 
+/** A date read from a FIXED position of a known message (shape rules). y may be missing (the year of receipt). */
+export function resolveDate(g, now) {
+  if (g.d === undefined || g.mo === undefined) return { source: 'none' };
+  const d = +g.d, mo = +g.mo, hasTime = g.hh !== undefined, hh = hasTime ? +g.hh : 12, mi = hasTime ? +g.mi : 0;
+  let y = g.y === undefined ? null : +g.y; if (y !== null && y < 100) y += 2000;
+  const assumed = y === null; if (assumed) y = cairoParts(now).year;
+  const chk = new Date(Date.UTC(y, mo - 1, d));
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || chk.getUTCMonth() !== mo - 1 || chk.getUTCDate() !== d || hh > 23 || mi > 59) return { error: 'date_malformed' };
+  let at = cairoToUtc(y, mo, d, hh, mi, 0);
+  if (assumed && at > now + 86400e3) { const c2 = new Date(Date.UTC(y - 1, mo - 1, d)); if (c2.getUTCDate() !== d) return { error: 'date_malformed' }; at = cairoToUtc(y - 1, mo, d, hh, mi, 0); }
+  if (at > now + 86400e3) return { error: 'date_in_future' };
+  if (at < now - 90 * 86400e3) return { error: 'date_too_old' };
+  return { at, source: hasTime ? 'sms' : 'sms_date_only' };
+}
+
 /* ============================== 2. the rules ============================== */
 // Building blocks. All patterns run on the FOLDED text (lower-case latin, unified alef/ya).
 const NB = '(?<![\\p{L}\\p{N}])', NA = '(?![\\p{L}\\p{N}])';                 // "not inside a word"
@@ -137,18 +152,50 @@ export const issuerOf = (sender) => { const n = normSender(sender); for (const [
      party    merchant / recipient / sender name, if the message has one
    To support another provider or wording: add a rule here (and a test with a real message). Nothing else changes.
 
-   STATUS: every rule below is PROVISIONAL - written from the typical wording of such messages, NOT yet checked
-   against real messages from the user's phone. A real message that differs is simply not recognised (nothing is
-   created); it can never be recorded as something else. */
+   A rule with "shape" describes the WHOLE structure of one real message: every value is taken from its fixed
+   position in that structure (the amount after its own wording, the balance / phone number / reference / advert
+   each in their own place), so one can never be mistaken for another. If the wording of such a message changes,
+   the shape no longer fits and nothing is created (structure_mismatch). */
+
+/* ---- VERIFIED rules: written against real messages (tests/fixtures/bank-sms.json, "real": true) ---- */
+const N = `\\d[\\d,.]*\\d|\\d`;                                  // a number as written (validated by parseAmount)
+const EGPW = `(?:جم|جنيها?|ج\\.م\\.?|egp|l\\.?e\\.?)`;               // Egyptian pounds
+const PHONE = `01\\d{9}`;
+const shape = (src) => new RegExp(src, 'ud');
+export const VERIFIED_RULES = [
+  // "تم تنفيذ تحويل لحظي من حسابكم رقم 0170 بمبلغ 1.00 جم إلى <name> رقم مرجعي <ref> يوم MM-DD الساعة HH:MM ..."
+  { id: 'nbe.instapay_out.ar', issuer: 'nbe', provider: 'instapay', kind: 'transfer_out', type: 'expense', dateOrder: 'md',
+    all: [A('تحويل لحظي'), A('تم تنفيذ'), A('من حسابكم')], none: [A('اضاف|استلام|خصم|بطاق')],
+    shape: shape(`^تم تنفيذ تحويل لحظي من حسابكم رقم ?\\d{2,8} بمبلغ ?(?<amount>${N}) ?${EGPW} الي (?<party>\\S.{0,78}?\\S) رقم مرجعي ?(?<ref>\\d{6,20}) يوم ?(?<mo>\\d{1,2})-(?<d>\\d{1,2}) الساعة ?(?<hh>\\d{1,2}):(?<mi>\\d{2})(?!\\d)`) },
+  // "تم إضافة تحويل لحظي لحسابكم رقم 0170 بمبلغ 205.00 جم من <name> رقم مرجعي <ref> يوم MM-DD الساعة HH:MM ..."
+  { id: 'nbe.instapay_in.ar', issuer: 'nbe', provider: 'instapay', kind: 'transfer_in', type: 'income', dateOrder: 'md',
+    all: [A('تحويل لحظي'), A('تم اضافة'), A('لحسابكم')], none: [A('تنفيذ|استلام|خصم|بطاق')],
+    shape: shape(`^تم اضافة تحويل لحظي لحسابكم رقم ?\\d{2,8} بمبلغ ?(?<amount>${N}) ?${EGPW} من (?<party>\\S.{0,78}?\\S) رقم مرجعي ?(?<ref>\\d{6,20}) يوم ?(?<mo>\\d{1,2})-(?<d>\\d{1,2}) الساعة ?(?<hh>\\d{1,2}):(?<mi>\\d{2})(?!\\d)`) },
+  // "تم خصم 200 EGP من بطاقة الخصم المباشر رقم2521 عندMansoura Market 2 D يوم12/11/26 الساعة21:43 المتاح11.31EGP ..."
+  { id: 'nbe.debit_card_purchase.ar', issuer: 'nbe', provider: 'debit_card', kind: 'card_purchase', type: 'expense', dateOrder: 'dmy',
+    all: [A('تم خصم'), A('بطاقة الخصم المباشر'), A('عند')], none: [A('سحب|صراف|atm|رد مبلغ|استرداد|عكس|الغاء|تحويل|ايداع|اضاف|استلام')],
+    shape: shape(`^تم خصم ?(?<amount>${N}) ?${EGPW} من بطاقة الخصم المباشر رقم ?\\d{4} عند ?(?<party>\\S.{0,78}?\\S) ?يوم ?(?<d>\\d{1,2})/(?<mo>\\d{1,2})/(?<y>\\d{4}|\\d{2}) الساعة ?(?<hh>\\d{1,2}):(?<mi>\\d{2}) المتاح ?(?<bal>${N}) ?${EGPW}`) },
+  // "تم استلام مبلغ 1.00 جنيه من 010...؛ المسجل بإسم <name> على رقم محفظتك 010... بتاريخ HH:MM YY-MM-DD. رصيدك الحالي: 6.93 جنيه رقم العملية: <ref> ..."
+  { id: 'vfc.received.ar', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'transfer_in', type: 'income', dateOrder: 'ymd',
+    all: [A('تم استلام مبلغ'), A('محفظتك'), A('رقم العملية')], none: [A('شحن|لحظي|انستاباي|instapay|خصم')],
+    shape: shape(`^تم استلام مبلغ ?(?<amount>${N}) ?${EGPW} من ${PHONE} ?[؛;]?(?: ?المسجل باسم (?<party>\\S.{0,78}?\\S))? علي رقم محفظتك ${PHONE} بتاريخ (?<hh>\\d{1,2}):(?<mi>\\d{2}) (?<y>\\d{2})-(?<mo>\\d{1,2})-(?<d>\\d{1,2})\\.? ?رصيدك الحالي: ?(?<bal>${N}) ?${EGPW} ?رقم العملية: ?(?<ref>\\d{6,20})(?!\\d)`) },
+  // "تم شحن رصيد موبايلك ب 30 بنجاح وخصم 30 من محفظتك شاملة الضريبة; رصيد حسابك في فودافون كاش الحالي 4.93. <advert>"
+  // the amount is what was TAKEN FROM THE WALLET (after "وخصم"); the message carries no date and no reference
+  { id: 'vfc.mobile_recharge.ar', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'mobile_recharge', type: 'expense',
+    all: [A('تم شحن رصيد موبايلك'), A('من محفظتك'), A('فودافون كاش')], none: [A('استلام|لحظي|انستاباي|instapay')],
+    shape: shape(`^تم شحن رصيد موبايلك ب ?(?<topup>${N}) بنجاح وخصم (?<amount>${N}) من محفظتك(?: شاملة الضريبة)? ?[؛;]? ?رصيد حسابك في فودافون كاش الحالي (?<bal>${N})(?![\\d,]|\\.\\d)`) },
+];
+
+/* ---- PROVISIONAL rules: written from the typical wording of such messages, NOT checked against real ones.
+   They are SWITCHED OFF in the deployed function (a message they would match is answered unrecognized_sms) and
+   only run in the tests / with the test-only setting BANK_SMS_PROVISIONAL_RULES=on. Each one is to be replaced
+   by a verified rule as soon as a real message of that kind is available. ---- */
 const EN_NOT_CARD = 'atm|withdraw\\w*|refund\\w*|revers\\w*|instapay|ipn|transfer\\w*|credited|deposit\\w*|received';
-export const RULES = [
+const PROVISIONAL = [
   // ---- bank card purchase -> expense on the account wallet
   { id: 'nbe.card_purchase.en', issuer: 'nbe', provider: 'bank_card', kind: 'card_purchase', type: 'expense',
     all: [W('card|visa|mastercard|meeza'), W('charged|purchase|pos|spent|debited')], none: [W(EN_NOT_CARD)],
     amount: amt('charged|purchase|spent|debited', EN_FILL), party: party(`${NB}at|${NB}at merchant`) },
-  { id: 'nbe.card_purchase.ar', issuer: 'nbe', provider: 'bank_card', kind: 'card_purchase', type: 'expense',
-    all: [A('بطاق'), A('خصم|شراء|مشتريات')], none: [A('سحب|صراف|atm|رد مبلغ|استرداد|عكس|الغاء|انستاباي|instapay|تحويل|ايداع|اضاف|استلام')],
-    amount: amt('خصم|شراء|مشتريات', AR_FILL), party: party('لدي|عند') },
   // ---- ATM cash withdrawal -> withdraw (account wallet -> cash wallet)
   { id: 'nbe.atm_withdrawal.en', issuer: 'nbe', provider: 'atm', kind: 'atm_withdrawal', type: 'withdraw',
     all: [W('atm'), W('withdraw\\w*')], none: [W('refund\\w*|revers\\w*|deposit\\w*|instapay|ipn|transfer\\w*')],
@@ -181,15 +228,9 @@ export const RULES = [
   { id: 'nbe.instapay_out.en', issuer: 'nbe', provider: 'instapay', kind: 'transfer_out', type: 'expense',
     all: [W('instapay|ipn'), W('sent|transferred|debited|transfer')], none: [W('received|credited|refund\\w*|revers\\w*|vodafone cash')],
     amount: new RegExp(`${NB}(?:sent|transferred|debited|transfer)${EN_FILL}\\s+${MONEY}|${money(2)}\\s+(?:was|has been|have been)\\s+(?:sent|transferred|debited)${NA}`, 'ud'), party: party(`${NB}to`) },
-  { id: 'nbe.instapay_out.ar', issuer: 'nbe', provider: 'instapay', kind: 'transfer_out', type: 'expense',
-    all: [A('انستاباي|instapay|تحويل لحظي'), A('تحويل')], none: [A('استلام|اضاف|رد مبلغ|استرداد|عكس|الغاء|فودافون كاش')],
-    amount: amt('تحويل', AR_FILL), party: party(`\\sالي`) },
   { id: 'nbe.instapay_in.en', issuer: 'nbe', provider: 'instapay', kind: 'transfer_in', type: 'income',
     all: [W('instapay|ipn'), W('received|credited')], none: [W('sent|transferred|debited|refund\\w*|revers\\w*|vodafone cash')],
     amount: amt('received|credited', EN_FILL), party: party(`${NB}from`) },
-  { id: 'nbe.instapay_in.ar', issuer: 'nbe', provider: 'instapay', kind: 'transfer_in', type: 'income',
-    all: [A('انستاباي|instapay|لحظي'), A('استلام|اضاف')], none: [A('رد مبلغ|استرداد|عكس|الغاء|فودافون كاش')],
-    amount: amt('استلام|اضاف\\S*', AR_FILL), party: party(`\\sمن`) },
   // ---- refund / reversal -> the money is back on the account wallet (income, marked as refund / reversal)
   { id: 'nbe.refund.en', issuer: 'nbe', provider: 'bank_card', kind: 'refund', type: 'income',
     all: [W('refund\\w*')], none: [W('revers\\w*|atm|withdraw\\w*')],
@@ -207,9 +248,6 @@ export const RULES = [
   { id: 'vfc.received.en', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'transfer_in', type: 'income',
     all: [W('received'), W('wallet|vodafone cash')], none: [W('refund\\w*|revers\\w*|instapay|ipn|sent|transferred|paid')],
     amount: amt('received', EN_FILL), party: party(`${NB}from`) },
-  { id: 'vfc.received.ar', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'transfer_in', type: 'income',
-    all: [A('استلام'), A('محفظ|فودافون كاش')], none: [A('رد مبلغ|استرداد|عكس|الغاء|انستاباي|instapay')],
-    amount: amt('استلام', AR_FILL), party: party(`\\sمن(?:\\s+رقم)?`) },
   { id: 'vfc.sent.en', issuer: 'vodafone_cash', provider: 'vodafone_cash', kind: 'transfer_out', type: 'expense',
     all: [W('transferred|sent|paid'), W('wallet|vodafone cash')], none: [W('received|refund\\w*|revers\\w*|instapay|ipn')],
     amount: amt('transferred|sent|paid', EN_FILL), party: party(`${NB}to`) },
@@ -217,6 +255,8 @@ export const RULES = [
     all: [A('تحويل|دفع'), A('محفظ|فودافون كاش')], none: [A('استلام|رد مبلغ|استرداد|عكس|الغاء|انستاباي|instapay')],
     amount: amt('تحويل|دفع', AR_FILL), party: party(`\\sالي(?:\\s+رقم)?`) },
 ];
+export const PROVISIONAL_RULES = PROVISIONAL.map((x) => ({ ...x, provisional: true }));
+export const RULES = [...VERIFIED_RULES, ...PROVISIONAL_RULES];
 
 // Messages that mention money but are NOT a completed transaction - checked before any rule.
 const NOT_TX = [
@@ -235,9 +275,21 @@ export function parseSms(text, opts = {}) {
   if (clean.length < 15 || clean.length > 1000) return { ok: false, reason: 'malformed_message' };
   const fold = foldSms(clean);
   for (const [reason, re] of NOT_TX) if (re.test(fold)) return { ok: false, reason };
-  const hits = RULES.filter((r) => (!opts.issuer || r.issuer === opts.issuer) && r.all.every((re) => re.test(fold)) && !r.none.some((re) => re.test(fold)));
+  const hits = RULES.filter((r) => (opts.provisional || !r.provisional) && (!opts.issuer || r.issuer === opts.issuer) && r.all.every((re) => re.test(fold)) && !r.none.some((re) => re.test(fold)));
   if (!hits.length) return { ok: false, reason: 'no_rule_matched' };
   if (new Set(hits.map((r) => `${r.provider}|${r.kind}|${r.type}`)).size > 1) return { ok: false, reason: 'ambiguous_message', rules: hits.map((r) => r.id) };
+  if (hits.some((r) => r.shape)) {
+    if (hits.length > 1) return { ok: false, reason: 'ambiguous_message', rules: hits.map((r) => r.id) };
+    const r = hits[0], m = r.shape.exec(fold);
+    if (!m) return { ok: false, reason: 'structure_mismatch', rule: r.id };
+    const g = m.groups, v = parseAmount(g.amount);
+    if (v === null || (g.bal !== undefined && parseAmount(g.bal) === null && Number(g.bal) !== 0) || (g.topup !== undefined && parseAmount(g.topup) === null)) return { ok: false, reason: 'amount_malformed', rule: r.id };
+    const when = resolveDate(g, now);
+    if (when.error) return { ok: false, reason: when.error, rule: r.id };
+    let who = ''; if (m.indices.groups.party) { const [s, e] = m.indices.groups.party; who = clean.slice(s, e).replace(/^[\s"'«»:؛;،,-]+|[\s"'«».؛;،,:-]+$/g, ''); }
+    return { ok: true, provider: r.provider, kind: r.kind, type: r.type, rule: r.id, amount: v, party: who.length < 2 ? '' : who, reference: g.ref || '',
+      at: new Date(when.source === 'none' ? now : when.at).toISOString(), date_source: when.source === 'none' ? 'received' : when.source };
+  }
   // several wordings of the same kind may match (e.g. a bilingual message): they must agree on the amount
   let rule = null, amount = null; const amounts = new Set();
   for (const r of hits) {
@@ -259,7 +311,7 @@ export function parseSms(text, opts = {}) {
 }
 
 /* ============================== 3. from parsed message to app transaction ============================== */
-const SERVICE = { bank_card: 'Card', atm: 'ATM', bank: 'Bank', instapay: 'InstaPay', vodafone_cash: 'Vodafone Cash' };
+const SERVICE = { debit_card: 'Debit card', bank_card: 'Card', atm: 'ATM', bank: 'Bank', instapay: 'InstaPay', vodafone_cash: 'Vodafone Cash' };
 const clip = (s, n) => { s = String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
 /** Category + note exactly in the app's own vocabulary (the same labels the app writes for manual entries).
@@ -268,6 +320,7 @@ export function describe(p) {
   const who = clip(p.party, 60), tag = 'Bank SMS · ' + (SERVICE[p.provider] || p.provider), ref = p.reference ? 'ref ' + p.reference : '';
   const note = (...first) => clip([...first, tag, ref].filter(Boolean).join(' · '), 200);
   switch (p.kind) {
+    case 'mobile_recharge': return { category: 'Vodafone Cash mobile recharge', note: note() };
     case 'card_purchase': return { category: who || 'Expense', note: note() };
     case 'transfer_out': return { category: who || 'Expense', note: note('Transfer') };
     case 'atm_withdrawal': return { category: 'Withdraw cash', note: note() };
@@ -326,7 +379,7 @@ export async function handle(req, env, fetchFn = fetch, now = Date.now()) {
   if (!issuer) { log({ key: k8, status: 'sender_not_supported' }); return reply(403, { ok: false, status: 'sender_not_supported' }); }
 
   // 4. parse - or stop
-  const p = parseSms(body.text, { issuer, now });
+  const p = parseSms(body.text, { issuer, now, provisional: env.BANK_SMS_PROVISIONAL_RULES === 'on' });
   if (!p.ok) { log({ key: k8, status: 'unrecognized_sms', reason: p.reason, rule: p.rule, issuer }); return reply(422, { ok: false, status: 'unrecognized_sms', reason: p.reason }); }
   const fp = await fingerprint(p, body.text), d = describe(p);
 

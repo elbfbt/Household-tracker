@@ -164,9 +164,34 @@ Rows that are still `pending` are delivered by the first successful call - no ma
 **Files:** `011 bank sms import.sql` (migration), `supabase/functions/bank-sms-import/index.ts` (new Edge Function),
 `tests/bank.test.mjs` + `tests/fixtures/bank-sms.json`, `tools/bank-sms-parse.mjs` (offline parser check).
 
-**The parser rules are provisional.** They were written from the typical wording of such messages, not from real
-messages. A real SMS that differs is answered with `unrecognized_sms` and nothing is created. Each rule has to be
-confirmed (or rewritten) against a real, sanitised message before it can be relied on.
+**Which messages are imported.** Only wording that was verified against real messages creates transactions:
+
+| Sender | Message (Arabic) | Result |
+|---|---|---|
+| BanK-AIAhly | InstaPay sent - "تم تنفيذ تحويل لحظي من حسابكم … بمبلغ … إلى … رقم مرجعي … يوم MM-DD الساعة HH:MM" | `expense`, description = recipient as written |
+| BanK-AIAhly | InstaPay received - "تم إضافة تحويل لحظي لحسابكم … بمبلغ … من … رقم مرجعي …" | `income`, note "From …" |
+| BanK-AIAhly | Debit card purchase - "تم خصم … من بطاقة الخصم المباشر … عند… يومDD/MM/YY الساعة… المتاح…" | `expense`, description = merchant |
+| Vodafone Cash | Money received - "تم استلام مبلغ … من 01… المسجل بإسم … رصيدك الحالي … رقم العملية …" | `income`, note "From <name>" (the phone number is not kept) |
+| Vodafone Cash | Mobile recharge - "تم شحن رصيد موبايلك ب … بنجاح وخصم … من محفظتك …" | `expense` "Vodafone Cash mobile recharge", amount = what left the wallet |
+
+Each of these rules describes the whole structure of its message; amount, balance, phone number, reference and
+advert each have a fixed place. A message whose wording differs is answered `unrecognized_sms`
+(`structure_mismatch`) and nothing is created.
+
+Everything else in the rule list (ATM withdrawal, cash deposit, account credit, plain bank transfer, refund,
+reversal, Vodafone Cash sent, all English wording) is **provisional**: written without a real message, and
+therefore switched off in the deployed function. Such a message is answered `unrecognized_sms` until a real example
+is supplied and its rule verified. (`BANK_SMS_PROVISIONAL_RULES=on` exists for the tests only - never set it.)
+
+A Vodafone Cash key must be created with the sender name the phone shows for those messages and with the wallet
+that represents the Vodafone Cash balance - the default wallet of a key is "Bank account":
+
+```sql
+select bank_import_key_new((select id from auth.users where email = 'YOUR-LOGIN-EMAIL'), 'VF-Cash',
+  (select w.id from wallets w join members m on m.household_id = w.household_id
+    where m.user_id = (select id from auth.users where email = 'YOUR-LOGIN-EMAIL') and w.name = 'YOUR VODAFONE CASH WALLET NAME'),
+  null, 365);
+```
 
 ### What becomes what
 
@@ -220,7 +245,7 @@ Dry run (parses, resolves wallets, checks duplicates, writes nothing):
 ```bash
 curl -s https://veftmxsqgbbhtrakmvbz.supabase.co/functions/v1/bank-sms-import \
   -H "Authorization: Bearer htk_YOUR_KEY" -H "Content-Type: application/json" \
-  -d '{"sender":"BanK-AIAhly","dry_run":true,"text":"Your card ending 1234 was charged EGP 12.50 at TEST SHOP. Ref 900000001"}'
+  -d '{"sender":"BanK-AIAhly","dry_run":true,"text":"<paste a real bank SMS here, not older than 90 days>"}'
 ```
 
 Remove `"dry_run":true` to create the entry; send the same request again to see `already_imported`.
