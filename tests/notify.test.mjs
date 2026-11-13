@@ -16,9 +16,12 @@ const sent=[];                       // every request that reached "OneSignal"
 const os={mode:'ok',invalid:[]},fakeState={partial:false};     // how "OneSignal" behaves
 const ENV={SUPABASE_URL:'https://proj.supabase.co',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service-secret',ONESIGNAL_REST_API_KEY:'os_v2_app_testkey'};
 const J=(status,body)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}});
+const auth={keys:['anon','service-secret'],down:false,busy:false},authCalls=[];   // API keys the project accepts right now
 async function fakeFetch(url,init={}){
   const h=init.headers||{};
-  if(url.endsWith('/auth/v1/user')){const tok=String(h.Authorization||'').replace('Bearer ','');           // token "user:<uuid>" = a valid login of that user
+  if(url.endsWith('/auth/v1/user')){authCalls.push(h.apikey);if(auth.down)throw new Error('connection refused');if(auth.busy)return J(503,{msg:'overloaded'});
+    if(!auth.keys.includes(h.apikey))return J(401,{message:'Invalid API key'});          // the API gateway in front of Supabase Auth
+    const tok=String(h.Authorization||'').replace('Bearer ','');           // token "user:<uuid>" = a valid login of that user
     const m=/^user:(.+)$/.exec(tok);if(!m)return J(401,{msg:'invalid JWT'});
     const u=(await admin.query('select id from auth.users where id=$1',[m[1]])).rows[0];return u?J(200,{id:u.id}):J(403,{msg:'user not found'})}
   if(url.includes('/rest/v1/rpc/')){if(h.apikey!==ENV.SUPABASE_SERVICE_ROLE_KEY)return J(401,{message:'bad key'});
@@ -31,9 +34,10 @@ async function fakeFetch(url,init={}){
     if(fakeState.partial&&b.include_subscription_ids.includes(sub(3)))return J(503,{errors:['try later']});
     const inv=b.include_subscription_ids.filter(x=>os.invalid.includes(x));return J(200,inv.length?{id:'n1',errors:{invalid_player_ids:inv}}:{id:'n1'})}
   throw new Error('unexpected request '+url)}
+const raw=async(headers,env=ENV)=>{const r=await handle(new Request('https://proj.supabase.co/functions/v1/notify-transactions',{method:'POST',headers,body:'{}'}),env,fakeFetch);return{status:r.status,...(await r.json())}};
 const call=async(uid,env=ENV,token)=>{const r=await handle(new Request('https://proj.supabase.co/functions/v1/notify-transactions',{method:'POST',headers:{Authorization:'Bearer '+(token||'user:'+uid)},body:'{"household_id":"ignored","recipients":["ignored"]}'}),env,fakeFetch);return{status:r.status,...(await r.json())}};
 const targets=()=>sent.map(s=>[...s.include_subscription_ids].sort());
-const outbox=async tx=>(await admin.query('select status,recipients,error from notification_outbox where transaction_id=$1',[tx])).rows[0];
+const outbox=async tx=>(await admin.query('select status,recipients,error,attempts from notification_outbox where transaction_id=$1',[tx])).rows[0];
 
 let A,B,WA={},WB={},Ahmed,Mona,Dad,Bob,Bea;
 const INS='insert into transactions(client_id,household_id,user_id,wallet_id,to_wallet_id,type,amount,category,note) values($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict (client_id) do nothing returning id';
@@ -85,6 +89,37 @@ try{
   await test('caller must be signed in: no token / forged token → 401, nothing sent, nothing claimed',async()=>{
     sent.length=0;const t=await add(Ahmed,A,cash(),'expense',6,'Pen');
     eq((await call(null,ENV,'garbage')).status,401);eq((await call(null,ENV,'user:00000000-0000-4000-8000-00000000ffff')).status,401);eq(sent.length,0);eq((await outbox(t)).status,'pending');await call(Ahmed);sent.length=0});
+  await test('auth: a valid session token is accepted exactly as the browser sends it (Authorization + apikey) and delivers',async()=>{
+    sent.length=0;authCalls.length=0;const t=await add(Ahmed,A,cash(),'expense',6,'Ink');
+    const r=await raw({Authorization:'Bearer user:'+Mona,apikey:'anon','x-client-info':'supabase-js-web/2.45.4','Content-Type':'application/json'});
+    eq([r.status,r.configured,r.claimed,r.sent],[200,true,1,1]);eq(authCalls,['anon'],'one Auth lookup:');eq((await outbox(t)).status,'sent');eq(targets(),[[sub(5)],[sub(3)]],'household only, creator excluded:');
+    sent.length=0;eq((await raw({authorization:'bearer user:'+Mona})).status,200,'header name / scheme are case-insensitive')});
+  await test('auth: missing token → 401 at stage function:no-token, Auth is not even asked; nothing claimed or sent',async()=>{
+    sent.length=0;authCalls.length=0;const t=await add(Ahmed,A,cash(),'expense',6,'Pad');
+    for(const h of [{},{apikey:'anon'},{Authorization:''},{Authorization:'Bearer '},{Authorization:'Bearer    '}]){const r=await raw(h);eq([r.status,r.error,r.stage],[401,'not signed in','function:no-token'])}
+    eq([authCalls.length,sent.length,(await outbox(t)).status,(await outbox(t)).attempts],[0,0,'pending',0]);await call(Ahmed);sent.length=0});
+  await test('auth: invalid tokens → 401 at stage function:auth-rejected with the reason (garbage, anon key instead of a session, expired, deleted user)',async()=>{
+    sent.length=0;const t=await add(Ahmed,A,cash(),'expense',6,'Cap');const jwt=c=>'h.'+Buffer.from(JSON.stringify(c)).toString('base64url')+'.sig';
+    let r=await raw({Authorization:'Bearer garbage',apikey:'anon'});eq([r.status,r.stage,r.detail],[401,'function:auth-rejected','auth HTTP 401 invalid JWT (the token is not a JWT)']);
+    r=await raw({Authorization:'Bearer '+jwt({role:'anon',exp:9e9}),apikey:'anon'});eq(r.status,401);ok(/the token is the project "anon" API key, not a user session/.test(r.detail),r.detail);
+    r=await raw({Authorization:'Bearer '+jwt({role:'authenticated',sub:Mona,exp:1}),apikey:'anon'});eq(r.status,401);ok(/the session token has expired/.test(r.detail),r.detail);
+    r=await raw({Authorization:'Bearer '+jwt({role:'authenticated',sub:Mona,exp:9e9}),apikey:'anon'});eq([r.status,r.stage],[401,'function:auth-rejected'],'well-formed claims naming a real member are worth nothing without Supabase Auth confirming the token');
+    r=await raw({Authorization:'Bearer user:00000000-0000-4000-8000-00000000ffff',apikey:'anon'});eq([r.status,r.detail],[401,'auth HTTP 403 user not found (the token is not a JWT)']);
+    r=await raw({Authorization:'Bearer garbage',apikey:'service-secret'});eq(r.status,401,'a valid API key never replaces a user token');
+    eq([sent.length,(await outbox(t)).status,(await outbox(t)).attempts],[0,'pending',0]);await call(Ahmed);sent.length=0});
+  await test('auth: the function\'s injected anon key is stale/absent → the caller is still verified through the API key the browser sent; a wrong browser key changes nothing',async()=>{
+    sent.length=0;const t=await add(Ahmed,A,cash(),'expense',6,'Mug');auth.keys=['sb_publishable_new'];             // project keys were rotated; SUPABASE_ANON_KEY in the function is the old one
+    let r=await raw({Authorization:'Bearer user:'+Mona});eq([r.status,r.stage,r.detail],[401,'function:auth-rejected','auth HTTP 401 Invalid API key (the token is not a JWT)'],'before the fix this was the only path:');eq((await outbox(t)).status,'pending');
+    r=await raw({Authorization:'Bearer garbage',apikey:'sb_publishable_new'});eq(r.status,401);
+    authCalls.length=0;r=await raw({Authorization:'Bearer user:'+Mona,apikey:'sb_publishable_new'});eq([r.status,r.sent],[200,1]);eq(authCalls,['sb_publishable_new']);eq((await outbox(t)).status,'sent');eq(targets(),[[sub(5)],[sub(3)]]);
+    auth.keys=['anon','service-secret'];sent.length=0;const t2=await add(Ahmed,A,cash(),'expense',6,'Jug');authCalls.length=0;
+    r=await raw({Authorization:'Bearer user:'+Mona,apikey:'made-up'});eq([r.status,r.sent],[200,1]);eq(authCalls,['made-up','anon'],'falls back to the injected key:');
+    r=await raw({Authorization:'Bearer user:'+Bob,apikey:'made-up'});eq([r.status,r.claimed],[200,0],'another household still gets nothing:');sent.length=0});
+  await test('auth: Supabase Auth unreachable / overloaded → 503 (not 401), nothing claimed; works again afterwards',async()=>{
+    sent.length=0;const t=await add(Ahmed,A,cash(),'expense',6,'Key');
+    auth.down=true;let r=await raw({Authorization:'Bearer user:'+Mona,apikey:'anon'});eq([r.status,r.stage],[503,'function:auth-unavailable']);auth.down=false;
+    auth.busy=true;r=await raw({Authorization:'Bearer user:'+Mona,apikey:'anon'});eq([r.status,r.detail],[503,'auth HTTP 503 overloaded']);auth.busy=false;
+    eq([(await outbox(t)).status,(await outbox(t)).attempts,sent.length],['pending',0,0]);eq((await call(Mona)).sent,1);sent.length=0});
   await test('all transaction types are announced (withdraw, deposit, transfer with wallets; built-in item localized by key)',async()=>{
     sent.length=0;const b=WA['Bank account'],c=cash(),p=WA['Personal cash'];
     await add(Ahmed,A,c,'deposit',1000,'Cash back to bank',{to:b});await add(Ahmed,A,c,'transfer',300,'Transfer',{to:p});await add(Ahmed,A,b,'withdraw',200,'Withdraw cash',{to:c});await add(Ahmed,A,c,'expense',20,'Bread');

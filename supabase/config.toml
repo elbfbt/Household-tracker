@@ -1,0 +1,5 @@
+# Used by `supabase functions deploy`. Without this file every CLI deploy switches the gateway check back ON.
+# notify-transactions authenticates the caller itself (Supabase Auth, /auth/v1/user) - it is NOT public:
+# a request without a valid user session token is answered with 401 by the function.
+[functions.notify-transactions]
+verify_jwt = false
