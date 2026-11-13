@@ -1,4 +1,4 @@
-const C='ht-v9',SHELL=['./','index.html','core.js','config.js','manifest.json','icon-192.png','icon-180.png'];
+const C='ht-v11',SHELL=['./','index.html','core.js','config.js','manifest.json','icon-192.png','icon-180.png'];
 // optional files: a missing/unreachable one must never make the whole install (= offline support) fail
 const OPT=['supabase.min.js','icon-512.png'];
 const LIBS=['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js','https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js'];

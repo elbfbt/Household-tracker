@@ -96,3 +96,44 @@ icon chooser. "Edit prices" also shows a × on each tile to remove it (past tran
 - No private OneSignal key is in the repository. Sending notifications from the backend would need the REST API key
   in a server-side secret (e.g. a Supabase Edge Function), never in this frontend.
 - Tests: `npm test` → unit 23, database 32, UI 35.
+
+## Version 8 — Household-only transaction notifications (stage 1)
+
+When a transaction is **committed** in the database, the *other* members of that household get a push
+notification. The person who made the entry is not notified about their own entry.
+
+**Setup (once)**
+1. SQL editor: run `010 transaction notifications.sql` (after 009).
+2. Edge Functions: deploy `supabase/functions/notify-transactions/index.ts` under the name `notify-transactions`
+   (dashboard editor: create function → paste the file; or `supabase functions deploy notify-transactions`).
+   Keep "Verify JWT" on.
+3. Edge Functions → Secrets: add `ONESIGNAL_REST_API_KEY` (OneSignal → Settings → Keys & IDs → REST API key).
+   Optional secret: `APP_URL` (page opened when a notification is tapped).
+
+**How it works**
+- Trigger `tx_notify_outbox` (AFTER INSERT on `transactions`) writes one row to `notification_outbox` inside the
+  same database transaction. Rejected / rolled-back entries leave nothing; `transaction_id` is unique.
+- The app calls the Edge Function with the user's login token and **no parameters** (a) right after its entries
+  were saved and (b) once each time the app is opened. The function asks Supabase Auth who is calling, then
+  `push_claim()` hands out the due rows of the caller's household(s), one run at a time.
+- Recipients are decided by the database function `push_targets(household, creator)`: devices of the *current*
+  members (`members` ⨝ `push_devices`) except the creator. A future notification-preference system changes only
+  this function.
+- `push_devices` maps a OneSignal subscription (one browser/phone) to the signed-in user. The app registers it
+  after login, removes it at log-out; a subscription has one owner; rows disappear with a deleted account.
+- A queued notification stays deliverable until processed. Temporary problems (network, OneSignal 5xx/429,
+  wrong key) put it back in the queue with a back-off. It is closed as `failed` (reason in
+  `notification_outbox.error`) only when: OneSignal rejects the request as invalid (4xx), 10 attempts failed, or
+  it could not be delivered for 48 hours. `skipped` = nobody but the creator has a subscribed device.
+- No duplicates: one row per transaction, one run per row, the same OneSignal idempotency key on every attempt,
+  and a language batch that was accepted is never sent again.
+- Neither table is reachable from the browser; `push_claim` / `push_done` / `push_targets` are service-role only.
+
+**Known limitation (stage 1):** delivery is started by an app of a household member (the creator's, right after
+saving; otherwise the next member who opens the app). If the creator closes the app in the instant between
+"saved" and that call, the others are notified only when someone next opens the app. Removing this needs a
+server-side starter: a database webhook / `pg_net` call on insert plus a `pg_cron` job for retries, calling this
+same function with a server credential. Not included in this stage.
+
+**Tests:** `npm test` → unit 23, database 32, notifications 27 (real Postgres + the real function code + a
+stand-in OneSignal), UI 45.

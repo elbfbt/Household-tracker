@@ -190,7 +190,23 @@ function dropDash(){if(ch){try{sb.removeChannel(ch)}catch(e){}ch=null}}
 function signedOut(msg){bootSeq++;dropDash();me=null;Qo=null;hh=null;sessionOk=false;resetState();authView(msg)}
 const EXPIRED='Your session expired. Log in again. Your unsynced entries are kept on this device.';
 /* Log out must also work offline / when the server is unreachable: supabase-js keeps the session if the request fails. */
+/* ---- push identity + household notifications -----------------------------------------------------------------
+   HTPushDevice: called by the push script to tell the DATABASE which signed-in user this device belongs to (or that it
+   no longer belongs to them). The server targets notifications from that table + household membership only.
+   pokeNotify: ask the Edge Function to deliver the household's queued notifications. It sends no parameters -
+   household and recipients are decided on the server. Called (1) right after entries were really saved on the
+   server and (2) once whenever the app is opened with a valid session, so a notification that could not go out
+   earlier (creator closed the app at once, OneSignal was down) is delivered by the next member who opens the app.
+   Failures never affect the saved entries. */
+window.HTPushDevice=async(sub,on,lang)=>{if(!me||!sessionOk||!navigator.onLine||!sub)return false;
+  try{const r=await timeout(sb.rpc(on?'register_push_device':'unregister_push_device',on?{sub,lng:lang==='ar'?'ar':'en'}:{sub}).then(x=>x,e=>({error:e})),8000);
+    if(r&&r.error)console.warn('push device:',r.error.message||r.error);return!!r&&!r.error}catch(e){return false}};
+const pushIdentify=()=>{try{if(window.HTPush&&window.HTPush.identify&&me&&sessionOk)window.HTPush.identify(me)}catch(e){}};
+const pushRelease=async()=>{try{if(window.HTPush&&window.HTPush.release)await timeout(window.HTPush.release(),5000)}catch(e){}};
+function pokeNotify(){try{if(!sb.functions||!navigator.onLine)return;
+  Promise.resolve(sb.functions.invoke('notify-transactions',{body:{}})).then(r=>{if(r&&r.error)console.warn('notifications:',r.error.message||r.error)},e=>console.warn('notifications:',e&&e.message||e))}catch(e){}}
 async function logout(){loggingOut=true;bootSeq++;
+  await pushRelease();                                             // while the token is still valid: this device stops being this user's
   try{const r=await timeout(sb.auth.signOut(),6000);if(!r||r.error)await timeout(sb.auth.signOut({scope:'local'}),4000)}catch(e){}
   if(storedUid()){try{localStorage.removeItem('ht-auth')}catch(e){}LS.removeItem('ht_hh');LS.removeItem('ht_c');return location.reload()}
   dropDash();hh=null;me=null;Qo=null;sessionOk=false;resetState();LS.removeItem('ht_hh');LS.removeItem('ht_c');boot()}
@@ -228,7 +244,8 @@ async function boot(){
     return signedOut(su||me?EXPIRED:'')}
   const uid=session.user.id;sessionOk=true;authLost=false;
   if(uid!==me){if(shown){shown=false;dropDash();hh=null}setUser(uid)}
-  LS.setItem('ht_last_uid',uid);adoptLegacy();
+  LS.setItem('ht_last_uid',uid);adoptLegacy();pushIdentify();
+  if(!window._poked){window._poked=1;setTimeout(()=>{if(me&&sessionOk)pokeNotify()},3500)}      // after startup, never competing with it
   if(!shown&&!$('#boot'))shellView();
   const r=(await timeout(sb.from('members').select('role,households(id,name,invite_code)').eq('user_id',uid).limit(1).then(x=>x,e=>({error:e})),12000))||{error:{message:'The server is taking too long to answer.'}};
   if(my!==bootSeq)return;
@@ -472,6 +489,7 @@ async function flush(){
     if(u0===me)authLost=r.stopped==='auth'}
   finally{busy=false}
   if(u0!==me||!hh)return;                                          // logged out / switched account while syncing
+  if(r.synced)pokeNotify();                                        // only now: these entries are committed on the server
   const did=!!(r.synced||r.failed||r.conflict);if(did)await load();else netPaint();
   const msgs=[...(r.errors||[]),...(r.conflicts||[])].map(failText);
   if(msgs.length)notify(msgs[0]+(msgs.length>1?` (+${msgs.length-1} ${T('more — see Needs attention')})`:''),true,true);
@@ -605,7 +623,7 @@ async function accountView(){const v=$('#more');
     if(!navigator.onLine)return notify(T('Internet connection required to delete your account.'));
     $('#dd').disabled=true;const {error}=await sb.rpc('delete_my_account',{confirm_text:'DELETE'});
     if(error){$('#de').textContent=error.message;$('#dd').disabled=false;return notify(error.message,true)}
-    const uid=me;try{Qo.all().forEach(o=>Qo.remove(o.qid));LS.removeItem('ht_trash:'+uid);if(LS.getItem('ht_last_uid')===uid)LS.removeItem('ht_last_uid')}catch(e){}
+    await pushRelease();const uid=me;try{Qo.all().forEach(o=>Qo.remove(o.qid));LS.removeItem('ht_trash:'+uid);if(LS.getItem('ht_last_uid')===uid)LS.removeItem('ht_last_uid')}catch(e){}
     loggingOut=true;bootSeq++;dropDash();LS.removeItem('ht_hh');LS.removeItem('ht_c');hh=null;me=null;Qo=null;sessionOk=false;resetState();
     try{await timeout(sb.auth.signOut({scope:'local'}),5000)}catch(e){}
     if(storedUid()){try{localStorage.removeItem('ht-auth')}catch(e){}}   // the account no longer exists: never keep its token on the device
@@ -639,7 +657,18 @@ add(LOCAL,function(){window.supabase?go():cdn()},cdn);
   var ar=false;try{ar=localStorage.getItem('ht_lang')==='ar'}catch(e){}
   var ios=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   var standalone=navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
-  var changed=function(){try{window.onHTPush&&window.onHTPush()}catch(e){}};
+  var uid=null,lastReg='',REOPT='ht_push_reopt';
+  var subId=function(){try{return OS.User.PushSubscription.id||null}catch(e){return null}};
+  var isOn=function(){try{return!!(OS.Notifications.permission&&OS.User.PushSubscription.optedIn&&subId())}catch(e){return false}};
+  /* tie this device to the signed-in Supabase user: OneSignal external id = Supabase user id, and the database is
+     told which subscription belongs to that user (that table is what the server targets). Safe to call repeatedly. */
+  var link=async function(){if(!ready||!uid)return;var u=uid;
+    try{var re=false;try{re=localStorage.getItem(REOPT)==='1'}catch(e){}
+      if(re){try{localStorage.removeItem(REOPT)}catch(e){}if(OS.Notifications.permission)await OS.User.PushSubscription.optIn()}   // was switched off by an offline log-out
+      await OS.login(u);if(u!==uid)return;try{OS.User.setLanguage(ar?'ar':'en')}catch(e){}
+      var id=subId();if(!id||!window.HTPushDevice)return;var want=isOn(),k=u+'|'+id+'|'+want+'|'+(ar?'ar':'en');if(k===lastReg)return;
+      if(await window.HTPushDevice(id,want,ar?'ar':'en'))lastReg=k}catch(e){console.warn('push identity:',e&&e.message||e)}};
+  var changed=function(){try{window.onHTPush&&window.onHTPush()}catch(e){}link()};
   window.HTPush={
     /* null = SDK not available (entry stays hidden) | 'on' | 'off' | 'blocked' */
     state:function(){if(!ready)return null;try{if(OS.Notifications.permissionNative==='denied')return'blocked';return OS.Notifications.permission&&OS.User.PushSubscription.optedIn?'on':'off'}catch(e){return null}},
@@ -652,7 +681,16 @@ add(LOCAL,function(){window.supabase?go():cdn()},cdn);
       if(!OS.Notifications.permission)await OS.Notifications.requestPermission();
       if(OS.Notifications.permissionNative==='denied')return'blocked';
       if(!OS.Notifications.permission)return'';                           // prompt dismissed: nothing changed, say nothing
-      await OS.User.PushSubscription.optIn();return'on'}catch(e){console.warn('push:',e);return'error'}}};
+      await OS.User.PushSubscription.optIn();return'on'}catch(e){console.warn('push:',e);return'error'}finally{link()}},
+    /* the signed-in user (called by the app once the session is verified, and again after an account switch) */
+    identify:function(u){if(u!==uid){uid=u;lastReg=''}return link()},
+    /* log out / account deleted: this device must stop receiving that user's household notifications.
+       1) the server forgets the device; 2) OneSignal forgets the user. If the server cannot be reached (offline),
+       push is switched off on the device instead and switched back on at the next login. */
+    release:async function(){var was=uid;uid=null;lastReg='';if(!ready||!was)return;
+      try{var id=subId(),done=false;if(id&&window.HTPushDevice)done=await window.HTPushDevice(id,false);
+        if(!done&&isOn()){await OS.User.PushSubscription.optOut();try{localStorage.setItem(REOPT,'1')}catch(e){}}
+        await OS.logout()}catch(e){console.warn('push release:',e&&e.message||e)}}};
   window.OneSignalDeferred=window.OneSignalDeferred||[];
   window.OneSignalDeferred.push(async function(OneSignal){
     try{
@@ -662,7 +700,7 @@ add(LOCAL,function(){window.supabase?go():cdn()},cdn);
         notifyButton:{enable:true,position:ar?'bottom-left':'bottom-right',
           displayPredicate:function(){try{return!(OneSignal.Notifications.permission&&OneSignal.User.PushSubscription.optedIn)}catch(e){return true}},   // the bell disappears once this device is subscribed (manage it from the settings menu)
           text:ar?{'tip.state.unsubscribed':'فعّل الإشعارات','tip.state.subscribed':'الإشعارات مفعّلة','tip.state.blocked':'الإشعارات محظورة','message.prenotify':'اضغط لتفعيل الإشعارات','message.action.subscribed':'شكرًا لاشتراكك!','message.action.resubscribed':'تم تفعيل الإشعارات','message.action.unsubscribed':'لن تصلك إشعارات بعد الآن','dialog.main.title':'إشعارات التطبيق','dialog.main.button.subscribe':'اشتراك','dialog.main.button.unsubscribe':'إلغاء الاشتراك','dialog.blocked.title':'إلغاء حظر الإشعارات','dialog.blocked.message':'اتبع التعليمات للسماح بالإشعارات:'}:undefined}});
-      OS=OneSignal;ready=true;changed();
+      OS=OneSignal;ready=true;changed();try{window.onHTPushReady&&window.onHTPushReady()}catch(e){}
       try{OneSignal.User.PushSubscription.addEventListener('change',changed);OneSignal.Notifications.addEventListener('permissionChange',changed)}catch(e){}
     }catch(e){console.warn('Push notifications are not available here:',e&&e.message||e)}   // e.g. this address is not the Site URL configured in OneSignal
   });

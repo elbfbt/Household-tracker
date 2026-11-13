@@ -3,9 +3,10 @@
   "private": true,
   "description": "Static PWA + Supabase. The app itself has no build step; these are test-only dev dependencies.",
   "scripts": {
-    "test": "node tests/unit.test.js && node tests/db.test.mjs && node tests/ui.test.mjs",
+    "test": "node tests/unit.test.js && node tests/db.test.mjs && node --no-warnings tests/notify.test.mjs && node tests/ui.test.mjs",
     "test:unit": "node tests/unit.test.js",
     "test:db": "node tests/db.test.mjs",
+    "test:notify": "node --no-warnings tests/notify.test.mjs",
     "test:ui": "node tests/ui.test.mjs"
   },
   "devDependencies": {
