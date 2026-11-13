@@ -437,15 +437,40 @@ console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v12'))return false;const c=await caches.open('ht-v12');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v13'))return false;const c=await caches.open('ht-v13');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
-  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v12');await new Promise(r=>setTimeout(r,200));
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v13');await new Promise(r=>setTimeout(r,200));
     return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
       cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
   eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');
   srv.dead=true;await p.cfg({down:true,auth:'netfail'});await p.net(false);
   await p.page.reload({waitUntil:'domcontentloaded'});await p.dash(3000);await p.status(/Offline/);eq(await p.text('#bal'),'EGP 730.00');noErr(p);
   srv.dead=false;srv.noSW=true;await p.close()});
+
+console.log('\nBank SMS: internal transfer suggestion');
+const XSEED=d=>{const H=d.households[0].id,WB=d.wallets.find(w=>w.name==='Bank account').id,WP=d.wallets.find(w=>w.name==='Personal cash').id,O=d.users[0].id,M=d.users[1].id,at=new Date(Date.now()-3600e3).toISOString();
+  d.transactions.push({id:'00000000-0000-4000-8000-0000000000a1',household_id:H,user_id:O,type:'expense',amount:50,wallet_id:WB,to_wallet_id:null,category:'MONA A****',note:'Transfer · Bank SMS · InstaPay · ref 1',created_at:at,updated_at:at},
+    {id:'00000000-0000-4000-8000-0000000000a2',household_id:H,user_id:M,type:'income',amount:50,wallet_id:WP,to_wallet_id:null,category:'Add income',note:'From OMAR · Bank SMS · Vodafone Cash · ref 2',created_at:at,updated_at:at});
+  d.bank_xfer={candidates:[{out_import:'i-out',in_import:'i-in',amount:50,at,out_transaction_id:'00000000-0000-4000-8000-0000000000a1',in_transaction_id:'00000000-0000-4000-8000-0000000000a2',from_wallet:'Bank account',to_wallet:'Personal cash',from_member:'Omar',to_member:'Mona',can_decide:true}],merged:[]}};
+await test('no bank import installed / no suggestion: the dashboard shows no suggestion card and no error',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();eq(await p.page.$eval('#itx',e=>[e.hidden,e.children.length]),[true,0]);eq(await p.text('#bal'),'EGP 730.00');noErr(p);await p.close()});
+await test('suggestion card → "Merge into one transfer": two entries become one transfer, totals unchanged, card turns into "Merged" with Undo; Undo restores both entries',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();await p.setDb(XSEED);await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();
+  await p.wait(()=>document.querySelector('#itx [data-xm]'));const card=await p.text('#itx');ok(/Possible internal transfer/.test(card)&&/EGP 50\.00/.test(card)&&/Omar/.test(card)&&/Mona/.test(card)&&/Bank account/.test(card)&&/Personal cash/.test(card),card);
+  await p.page.$eval('#itx',e=>e.scrollIntoView());await p.shot('xfer-card');
+  const bal0=await p.text('#bal'),n0=(await p.db()).transactions.length;
+  await p.page.$eval('#itx [data-xm]',e=>e.click());await p.wait(()=>document.querySelector('#itx [data-xu]'));ok(/Merged into one transfer/.test(await p.toast()),'toast');
+  let d=await p.db();eq([d.transactions.length,d.transactions.filter(t=>t.type==='transfer'&&+t.amount===50).length,d.transactions.some(t=>/0000000000a[12]$/.test(t.id))],[n0-1,1,false]);
+  eq(await p.text('#bal'),bal0,'total balance unchanged');ok(/Merged internal transfer/.test(await p.text('#itx')));eq(await p.has('#itx [data-xm]'),false);
+  await p.page.$eval('#itx [data-xu]',e=>e.click());await p.wait(()=>document.querySelector('#itx').hidden);ok(/original entries were restored/.test(await p.toast()),'toast');
+  d=await p.db();eq([d.transactions.length,d.transactions.filter(t=>/0000000000a[12]$/.test(t.id)).map(t=>t.type).sort(),d.transactions.filter(t=>t.type==='transfer'&&+t.amount===50).length],[n0,['expense','income'],0]);
+  eq(await p.text('#bal'),bal0);noErr(p);await p.close()});
+await test('"Not a transfer" removes the card and changes no entry; a member who may not decide sees the card without buttons; Arabic labels; nothing offline',async()=>{
+  let p=await open({uid:O});await p.go();await p.dash();await p.setDb(XSEED);await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.wait(()=>document.querySelector('#itx [data-xd]'));
+  const n0=(await p.db()).transactions.length;await p.page.$eval('#itx [data-xd]',e=>e.click());await p.wait(()=>document.querySelector('#itx').hidden);eq((await p.db()).transactions.length,n0);eq((await p.db()).bank_xfer.candidates.length,0);noErr(p);await p.close();
+  p=await open({uid:M,lang:'ar'});await p.go();await p.dash();await p.setDb(new Function('d','('+XSEED.toString()+')(d);d.bank_xfer.candidates[0].can_decide=false'));await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();
+  await p.wait(()=>document.querySelector('#itx .xc'));const t=await p.text('#itx');ok(/تحويل داخلي محتمل/.test(t)&&!/Possible internal/.test(t),t);eq(await p.has('#itx button'),false);
+  await p.net(false);await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();eq(await p.page.$eval('#itx',e=>e.hidden),true,'offline: suggestions are not shown from stale data');noErr(p);await p.close()});
 }catch(e){console.error(e);process.exitCode=1}
 finally{done('ui');await browser.close();server.close()}

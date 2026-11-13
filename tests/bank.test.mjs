@@ -260,7 +260,7 @@ try{
   await test('migration 011 is additive and can be run twice; existing tables, policies and triggers are untouched',async()=>{
     const snap=async()=>JSON.stringify((await admin.query("select (select json_agg(x order by x) from (select tablename||':'||policyname||':'||coalesce(qual,'')||':'||coalesce(with_check,'') x from pg_policies where schemaname='public' and tablename not like 'bank_%') p) pol,(select json_agg(x order by x) from (select tgrelid::regclass||':'||tgname x from pg_trigger where not tgisinternal) t) trg,(select json_agg(x order by x) from (select table_name||'.'||column_name||':'||data_type x from information_schema.columns where table_schema='public' and table_name not like 'bank_%') c) col")).rows[0]);
     const before=await snap();await db.migrate(['011 bank sms import.sql']);const mid=await snap();await db.migrate(['011 bank sms import.sql']);eq(await snap(),mid);eq(mid,before);
-    eq((await admin.query("select tablename from pg_tables where schemaname='public' and tablename like 'bank_%' order by 1")).rows.map(r=>r.tablename),['bank_import_keys','bank_imports'])});
+    eq((await admin.query("select tablename from pg_tables where schemaname='public' and tablename like 'bank_%' order by 1")).rows.map(r=>r.tablename),['bank_import_keys','bank_imports','bank_transfer_merges'])});
   await test('import key: created by the signed-in user for themselves, shown once, stored only as a hash, bound to the app\'s own wallets',async()=>{
     const k=await newKey(Ahmed);kA=k.key;ok(/^htk_[0-9a-f]{64}$/.test(kA),'key format');eq([k.sender,k.wallet,k.cash_wallet],['BanK-AIAhly','Bank account','Household cash']);
     const row=(await admin.query('select * from bank_import_keys where user_id=$1',[Ahmed])).rows[0];eq([row.user_id,row.household_id,row.wallet_id,row.cash_wallet_id],[Ahmed,A,WA['Bank account'],WA['Household cash']]);
@@ -524,6 +524,164 @@ try{
     eq(await postReal(kVF,{...R.real2_vfcash_out,text:R.real2_vfcash_out.text.replace('مصاريف الخدمة 0 جنيه','مصاريف الخدمة 1 جنيه').replace('024986273684','024986273999')}),{http:422,ok:false,status:'unrecognized_sms',reason:'fee_not_verified'});
     eq((await postReal(kVF,{...R.real2_vfcash_out,text:R.real2_vfcash_out.text.replace('105 جنيه ','')})).status,'unrecognized_sms');eq((await postReal(kVF,{...R.real2_vfcash_out,text:R.real2_vfcash_out.text+' '+R.real2_vfcash_recharge_5.text})).status,'unrecognized_sms');
     eq((await postReal(kA,{...R.real2_card_zainy_800,text:R.real2_card_zainy_800.text.replace('تم خصم 800 EGP','تم خصم')})).status,'unrecognized_sms');eq((await postReal(kA,{sender:'BanK-AIAhly',text:R.real2_vfcash_out.text})).status,'unrecognized_sms');eq(await count(A),n)});
+
+  console.log('\nInternal transfers between household wallets: suggest, confirm, undo');
+  // real message formats, only amount / reference / time vary.  day = day of November 2026, t = "HH:MM" (Cairo)
+  const ipOut=(amt,ref,day,t)=>`تم تنفيذ تحويل لحظي من حسابكم رقم 0170 بمبلغ ${amt} جم إلى MONA A**** رقم مرجعي ${ref} يوم 11-${day} الساعة ${t} للمزيد اتصل بـ 19623`;
+  const ipIn=(amt,ref,day,t)=>`تم إضافة تحويل لحظي لحسابكم رقم 0170 بمبلغ ${amt} جم من AHMED TEST رقم مرجعي ${ref} يوم 11-${day} الساعة ${t} للمزيد اتصل بـ 19623`;
+  const vfIn=(amt,ref,day,t)=>`تم استلام مبلغ ${amt} جنيه من 01095872700؛\nالمسجل بإسم AHMED TEST\nعلى رقم محفظتك 01095872700 بتاريخ ${t} 26-11-${day}.\nرصيدك الحالي: 6.93 جنيه\nرقم العملية: ${ref}\nتقدر تتابع كل مصروفاتك من تاريخ المعاملات على أبلكيشن أنا فودافون http://vf.eg/vfcash`;
+  const vfOut=(amt,ref,day,t)=>`تم تحويل ${amt} جنيه لرقم 01064773881 مصاريف الخدمة 0 جنيه رصيد حسابك فى فودافون كاش الحالي 3.93.\nتاريخ العملية ${t} 26-11-${day} :\nرقم العملية ${ref} :\nحول فلوس لأي محفظة وزود فرصك تكسب جنيه دهب! وكمان هيجيلك لحد 100ج كاش باك. http://vf.eg/vfcash?id=money_transfer`;
+  let kMV;const SND={nbe:'BanK-AIAhly',vf:'VF-Cash'};
+  const Zed=await user('Zaki');await as(Zed,'select join_household($1)',[(await one(Ahmed,'select invite_code c from households where id=$1',[A])).c]);   // a third member, never involved
+  // -> the import record of the entry that was created
+  const put=async(key,sender,text)=>{const r=await postReal(key,{sender,text});if(r.status!=='imported')throw new Error('import: '+JSON.stringify(r));
+    const i=(await admin.query('select * from bank_imports where transaction_id=$1',[r.transaction_id])).rows[0];return{imp:i.id,tx:r.transaction_id,fp:i.fingerprint,text,key,sender}};
+  const rpcAs=(u,sql,params)=>db.conn().then(c=>db.as(u,sql,params,c).finally(()=>c.end())).then(x=>x.rows[0].r);        // own connection: really concurrent
+  const cands=async u=>(await one(u,'select bank_transfer_candidates($1) r',[A])).r;
+  const sugg=async(u,o,i)=>(await cands(u)).candidates.filter(c=>c.out_import===o.imp&&c.in_import===i.imp);
+  const anyFor=async x=>(await cands(Ahmed)).candidates.filter(c=>c.out_import===x.imp||c.in_import===x.imp).length;
+  const confirm=(u,o,i)=>one(u,'select bank_transfer_confirm($1,$2) r',[o.imp,i.imp]).then(x=>x.r);
+  const undo=(u,m)=>one(u,'select bank_transfer_undo($1) r',[m]).then(x=>x.r);
+  const row=async id=>(await admin.query('select to_jsonb(t) j from transactions t where id=$1',[id])).rows[0]?.j||null;
+  const stats=async day=>{const s=(await one(Ahmed,'select range_stats($1,$2,$2) s',[A,'2026-11-'+day])).s;return[+s.income,+s.expenses]};
+  const total=async()=>+(await one(Ahmed,'select household_summary($1) s',[A])).s.balance;
+  const audits=async id=>(await admin.query('select action,actor,old_row from audit_log where tx_id=$1 order by id',[id])).rows;
+  const nImp=async()=>(await imports(A)).length;
+  let P1,M1;                                                                  // the pair / merge the following tests share
+
+  await test('suggestion: outgoing from one wallet + incoming on another, same amount, 3 minutes apart (incoming stamped EARLIER, other provider, other reference) → suggested, nothing changed; one side alone → nothing',async()=>{
+    kMV=(await newKey(Mona,'VF-Cash',WA['Household cash'],WA['Personal cash'])).key;
+    const n0=await count(A);const o=await put(kA,SND.nbe,ipOut('500.00','710000000001','05','10:03'));eq(await anyFor(o),0,'only the outgoing side exists: no suggestion');
+    eq((await row(o.tx)).type,'expense','a transfer whose other side is unknown stays an expense (transfer to someone outside)');
+    const i=await put(kMV,SND.vf,vfIn('500.00','720000000001','05','10:00'));P1={o,i};
+    const c=await sugg(Ahmed,o,i);eq(c.length,1);eq([c[0].amount,c[0].from_wallet,c[0].to_wallet,c[0].from_member,c[0].to_member,c[0].can_decide,c[0].out_transaction_id,c[0].in_transaction_id],[500,'Bank account','Household cash','Ahmed','Mona',true,o.tx,i.tx]);
+    eq((await sugg(Mona,o,i))[0].can_decide,true,'the receiving member may decide');eq((await sugg(Zed,o,i))[0].can_decide,false,'a member who is not involved sees it but cannot decide');
+    eq([await count(A),(await row(o.tx)).type,(await row(i.tx)).type],[n0+2,'expense','income'],'suggesting changes nothing');
+    eq((await cands(Bob)).candidates.length+(await cands(Bob)).merged.length,0,'another household sees nothing');eq((await one(Bob,'select bank_transfer_candidates($1) r',[B])).r.candidates,[])});
+  await test('no suggestion: amounts differ by 0.01; 16 minutes apart; same wallet; a card purchase or recharge with the same amount; exactly 15 minutes IS inside',async()=>{
+    let o=await put(kA,SND.nbe,ipOut('61.00','710000000010','04','09:00')),i=await put(kMV,SND.vf,vfIn('61.01','720000000010','04','09:00'));eq([await anyFor(o),await anyFor(i)],[0,0],'amount');
+    o=await put(kA,SND.nbe,ipOut('62.00','710000000011','04','11:00'));i=await put(kMV,SND.vf,vfIn('62.00','720000000011','04','11:16'));eq([await anyFor(o),await anyFor(i)],[0,0],'16 minutes');
+    o=await put(kA,SND.nbe,ipOut('63.00','710000000012','04','13:00'));i=await put(kMona,SND.nbe,ipIn('63.00','710000000013','04','13:01'));eq([await anyFor(o),await anyFor(i)],[0,0],'both keys point at the same wallet');
+    const card=await put(kA,SND.nbe,R.real2_card_wekalet_182.text.replace('182 EGP','64 EGP').replace('09/11/26','04/11/26').replace('15:23','15:00'));i=await put(kMV,SND.vf,vfIn('64.00','720000000014','04','15:00'));eq(await anyFor(i),0,'a card purchase is not a transfer');
+    o=await put(kA,SND.nbe,ipOut('65.00','710000000015','04','17:00'));i=await put(kMV,SND.vf,vfIn('65.00','720000000015','04','17:15'));eq((await sugg(Ahmed,o,i)).length,1,'15 minutes');
+    const o2=await put(kA,SND.nbe,ipOut('66.00','710000000016','04','19:15')),i2=await put(kMV,SND.vf,vfIn('66.00','720000000016','04','19:00'));eq((await sugg(Ahmed,o2,i2)).length,1,'15 minutes, incoming first');
+    eq((await one(Ahmed,'select bank_transfer_dismiss($1,$2) r',[o.imp,i.imp])).r.status,'dismissed');eq((await one(Ahmed,'select bank_transfer_dismiss($1,$2) r',[o2.imp,i2.imp])).r.status,'dismissed')});
+  await test('ambiguous → no suggestion and confirm refuses: one outgoing with two possible incoming; two outgoing with one incoming; only amounts match',async()=>{
+    const o=await put(kA,SND.nbe,ipOut('250.00','710000000020','06','10:00')),i1=await put(kMV,SND.vf,vfIn('250.00','720000000020','06','10:02'));eq((await sugg(Ahmed,o,i1)).length,1,'unique so far');
+    const i2=await put(kVF,SND.vf,vfIn('250.00','720000000021','06','10:05'));eq([await anyFor(o),await anyFor(i1),await anyFor(i2)],[0,0,0],'a second possible incoming appeared');
+    const n=await count(A);eq(await confirm(Ahmed,o,i1),{status:'not_eligible',reason:'conditions_not_met'});eq(await confirm(Ahmed,o,i2),{status:'not_eligible',reason:'conditions_not_met'});eq(await count(A),n);
+    const oa=await put(kA,SND.nbe,ipOut('260.00','710000000022','06','12:00')),ob=await put(kVF,SND.vf,vfOut('260','720000000022','06','12:04')),ic=await put(kMV,SND.vf,vfIn('260.00','720000000023','06','12:02'));
+    eq([await anyFor(oa),await anyFor(ob),await anyFor(ic)],[0,0,0],'two possible outgoing');
+    const far=await put(kA,SND.nbe,ipOut('270.00','710000000024','06','14:00')),far2=await put(kMV,SND.vf,vfIn('270.00','720000000024','07','14:00'));eq([await anyFor(far),await anyFor(far2)],[0,0],'same amount a day apart is not a match')});
+  await test('edited or deleted entries are never suggested and cannot be confirmed',async()=>{
+    const o=await put(kA,SND.nbe,ipOut('320.00','710000000030','07','10:00')),i=await put(kMV,SND.vf,vfIn('320.00','720000000030','07','10:01'));eq((await sugg(Ahmed,o,i)).length,1);
+    await as(Ahmed,"update transactions set note=note||' x' where id=$1",[o.tx]);eq(await anyFor(o),0,'edited (even only the note)');eq(await confirm(Ahmed,o,i),{status:'not_eligible',reason:'conditions_not_met'});
+    const o2=await put(kA,SND.nbe,ipOut('330.00','710000000031','07','12:00')),i2=await put(kMV,SND.vf,vfIn('330.00','720000000031','07','12:01'));eq((await sugg(Ahmed,o2,i2)).length,1);
+    await as(Mona,'delete from transactions where id=$1',[i2.tx]);eq(await anyFor(o2),0,'the other side was deleted');eq(await confirm(Ahmed,o2,i2),{status:'not_eligible',reason:'conditions_not_met'});
+    eq((await postReal(i2.key,i2)).status,'already_imported','a deleted import still is not imported twice')});
+  await test('who may decide: an uninvolved member cannot confirm; another household gets not_found; the tables and internal functions are closed; the creator rule still holds outside a merge',async()=>{
+    const {o,i}=P1,n=await count(A);
+    await throws(()=>confirm(Zed,o,i),/only the two members involved or the household owner/);eq(await confirm(Bob,o,i),{status:'not_found'});
+    eq((await one(Bob,'select bank_transfer_dismiss($1,$2) r',[o.imp,i.imp])).r,{status:'not_found'});eq(await confirm(Ahmed,i,o),{status:'not_eligible',reason:'conditions_not_met'},'sides swapped');
+    eq(await confirm(Ahmed,{imp:sub(999)},i),{status:'not_found'});
+    await throws(()=>as(Mona,"insert into bank_transfer_merges(household_id,out_import_id,in_import_id,status,out_tx_id,in_tx_id) values($1,$2,$3,'dismissed',$4,$5)",[A,o.imp,i.imp,o.tx,i.tx]),/permission denied/);
+    await throws(()=>as(Mona,'update bank_imports set transaction_id=null where id=$1',[o.imp]),/permission denied/);
+    await throws(()=>as(Mona,'select * from bank_transfer_pairs($1)',[A]),/permission denied/);await throws(()=>as(Mona,'select * from bank_transfer_eligible($1)',[A]),/permission denied/);
+    await throws(()=>as(Mona,INS,[A,Ahmed,WA['Household cash'],null,'income',1,'Fake','']),/cannot create a transaction for another user/);
+    eq([await count(A),(await sugg(Ahmed,o,i)).length],[n,1],'nothing changed')});
+  await test('confirm (by the receiving member): the two entries become ONE transfer Bank account → Household cash; balances identical; no longer income / expense; import records kept; no notification',async()=>{
+    const {o,i}=P1,b0=await bal(Ahmed,A),n0=await count(A),ni=await nImp(),s0=await stats('05'),t0=await total(),ro=await row(o.tx),ri=await row(i.tx);sent.length=0;
+    const r=await confirm(Mona,o,i);eq(r.status,'merged');ok(r.merge_id&&r.transaction_id);M1={id:r.merge_id,tx:r.transaction_id,ro,ri};
+    eq([await row(o.tx),await row(i.tx),await count(A)],[null,null,n0-1],'the two originals are replaced by one entry');
+    const t=await row(r.transaction_id);eq([t.type,t.wallet_id,t.to_wallet_id,+t.amount,t.user_id,t.household_id,t.category,t.note,t.created_at],['transfer',WA['Bank account'],WA['Household cash'],500,Ahmed,A,'Transfer','Bank SMS · internal transfer · ref 710000000001 · ref 720000000001',ro.created_at]);
+    eq(await bal(Ahmed,A),b0,'every wallet balance is exactly what it was');eq(await total(),t0,'household total unchanged');
+    eq(await stats('05'),[s0[0]-500,s0[1]-500],'the 500 no longer counts as income nor as expense');
+    const im=(await admin.query('select id,fingerprint,transaction_id from bank_imports where id=any($1) order by id',[[o.imp,i.imp]])).rows;eq(await nImp(),ni,'no import record added or removed');
+    eq(im.map(x=>[x.id,x.fingerprint,x.transaction_id]).sort(),[[o.imp,o.fp,t.id],[i.imp,i.fp,t.id]].sort(),'same import ids and fingerprints, now pointing at the transfer');
+    const m=(await admin.query('select * from bank_transfer_merges where id=$1',[r.merge_id])).rows[0];
+    eq([m.status,m.out_import_id,m.in_import_id,m.out_tx_id,m.in_tx_id,m.transfer_tx_id,m.decided_by,m.household_id],['confirmed',o.imp,i.imp,o.tx,i.tx,t.id,Mona,A]);ok(m.decided_at instanceof Date);
+    eq([m.snapshot.out,m.snapshot.in,m.snapshot.out_import,m.snapshot.in_import],[ro,ri,{id:o.imp,fingerprint:o.fp},{id:i.imp,fingerprint:i.fp}],'the snapshot holds both original rows completely');
+    const ob=await outbox(t.id);eq([ob.status,ob.recipients,ob.attempts],['skipped',null,0],'the transfer is never announced');
+    const other=await put(kA,SND.nbe,ipOut('1.00','710000000040','08','08:00'));eq([sent.length,(await outbox(other.tx)).status,(await outbox(t.id)).status],[1,'sent','skipped'],'a later run of the notification pipeline sends only the unrelated new entry');
+    eq((await cands(Ahmed)).merged.filter(x=>x.id===r.merge_id).map(x=>[x.amount,x.from_wallet,x.to_wallet,x.decided_by,x.can_undo,x.transaction_id]),[[500,'Bank account','Household cash','Mona',true,t.id]]);eq((await sugg(Ahmed,o,i)).length,0)});
+  await test('audit history after the merge: one DELETE record per original entry (who merged, the full old row); earlier history of those entries is untouched',async()=>{
+    const a=await audits(P1.o.tx),b=await audits(P1.i.tx);eq([a.map(x=>[x.action,x.actor]),b.map(x=>[x.action,x.actor])],[[['DELETE',Mona]],[['DELETE',Mona]]]);
+    eq([a[0].old_row,b[0].old_row],[M1.ro,M1.ri]);eq(await audits(M1.tx),[],'the new transfer has no change history yet')});
+  await test('idempotent: confirming the merged pair again (same or other member, ten at once) returns the SAME merge; importing either SMS again → already_imported pointing at the transfer',async()=>{
+    const {o,i}=P1,n=await count(A),nm=+(await admin.query('select count(*) n from bank_transfer_merges')).rows[0].n;
+    const want={status:'already_merged',merge_id:M1.id,transaction_id:M1.tx};eq(await confirm(Mona,o,i),want);eq(await confirm(Ahmed,o,i),want);
+    eq(await Promise.all(Array.from({length:10},(_,k)=>rpcAs(k%2?Ahmed:Mona,'select bank_transfer_confirm($1,$2) r',[o.imp,i.imp]))),Array(10).fill(want));
+    for(const x of [o,i]){const r=await postReal(x.key,x);eq([r.status,r.transaction_id],['already_imported',M1.tx]);eq((await Promise.all(Array.from({length:5},()=>postReal(x.key,x)))).map(y=>y.status),Array(5).fill('already_imported'))}
+    eq([await count(A),+(await admin.query('select count(*) n from bank_transfer_merges')).rows[0].n],[n,nm])});
+  await test('race: ten members confirm a NEW pair at the same moment → exactly one merge, one transfer; database rules: an import can be in one confirmed merge only, one decision per pair',async()=>{
+    const o=await put(kA,SND.nbe,ipOut('410.00','710000000050','08','10:00')),i=await put(kMV,SND.vf,vfIn('410.00','720000000050','08','10:01')),n=await count(A),b=await bal(Ahmed,A);
+    const rs=await Promise.all(Array.from({length:10},(_,k)=>rpcAs(k%2?Ahmed:Mona,'select bank_transfer_confirm($1,$2) r',[o.imp,i.imp])));
+    eq(rs.map(x=>x.status).sort(),['merged',...Array(9).fill('already_merged')].sort());eq(new Set(rs.map(x=>x.transaction_id)).size,1);eq(new Set(rs.map(x=>x.merge_id)).size,1);
+    eq([await count(A),await bal(Ahmed,A)],[n-1,b]);eq(+(await admin.query("select count(*) n from transactions where type='transfer' and note like '%710000000050%'")).rows[0].n,1);
+    const x=await put(kVF,SND.vf,vfIn('411.00','720000000051','08','11:00'));
+    await throws(()=>admin.query("insert into bank_transfer_merges(household_id,out_import_id,in_import_id,status,out_tx_id,in_tx_id,transfer_tx_id,snapshot) values($1,$2,$3,'confirmed',$4,$4,$4,'{}')",[A,o.imp,x.imp,x.tx]),/bank_transfer_merges_out_confirmed/);
+    await throws(()=>admin.query("insert into bank_transfer_merges(household_id,out_import_id,in_import_id,status,out_tx_id,in_tx_id,transfer_tx_id,snapshot) values($1,$2,$3,'confirmed',$4,$4,$4,'{}')",[A,x.imp,i.imp,x.tx]),/bank_transfer_merges_in_confirmed/);
+    await throws(()=>admin.query("insert into bank_transfer_merges(household_id,out_import_id,in_import_id,status,out_tx_id,in_tx_id) values($1,$2,$3,'dismissed',$4,$4)",[A,o.imp,i.imp,x.tx]),/bank_transfer_merges_pair/);
+    await throws(()=>admin.query("insert into bank_transfer_merges(household_id,out_import_id,in_import_id,status,out_tx_id,in_tx_id) values($1,$2,$2,'dismissed',$3,$3)",[A,x.imp,x.tx]),/bank_transfer_merges_two_imports/);
+    await throws(()=>admin.query("insert into bank_transfer_merges(household_id,out_import_id,in_import_id,status,out_tx_id,in_tx_id) values($1,$2,$3,'confirmed',$4,$4)",[A,x.imp,o.imp,x.tx]),/bank_transfer_merges_complete/)});
+  await test('undo: the two ORIGINAL entries come back exactly (same ids, creator, wallet, type, amount, description, note, time, client id); balances and statistics as before the merge; no notification',async()=>{
+    const {o,i}=P1,b0=await bal(Ahmed,A),n0=await count(A),ni=await nImp(),s0=await stats('05'),t0=await total();sent.length=0;
+    await throws(()=>undo(Zed,M1.id),/only the two members involved or the household owner/);eq(await undo(Bob,M1.id),{status:'not_found'});eq(await count(A),n0);
+    const r=await undo(Ahmed,M1.id);eq(r,{status:'undone',out_transaction_id:o.tx,in_transaction_id:i.tx});
+    const ro=await row(o.tx),ri=await row(i.tx),strip=x=>{const{updated_at,...y}=x;return y};
+    eq([strip(ro),strip(ri)],[strip(M1.ro),strip(M1.ri)],'every column except the "last changed" stamp is identical to the original row');ok(ro.updated_at>M1.ro.updated_at,'updated_at is new, so every device notices the change');
+    eq([await row(M1.tx),await count(A)],[null,n0+1],'the transfer is gone, two entries are back');eq(await bal(Ahmed,A),b0);eq(await total(),t0);eq(await stats('05'),[s0[0]+500,s0[1]+500],'counted as income and expense again');
+    const im=(await admin.query('select id,fingerprint,transaction_id from bank_imports where id=any($1)',[[o.imp,i.imp]])).rows;eq(await nImp(),ni,'no import record created or removed by the undo');
+    eq(im.map(x=>[x.id,x.fingerprint,x.transaction_id]).sort(),[[o.imp,o.fp,o.tx],[i.imp,i.fp,i.tx]].sort(),'the same import records point at their original entries again');
+    const m=(await admin.query('select * from bank_transfer_merges where id=$1',[M1.id])).rows[0];eq([m.status,m.undone_by,m.decided_by,m.out_tx_id,m.in_tx_id,m.transfer_tx_id],['undone',Ahmed,Mona,o.tx,i.tx,M1.tx]);ok(m.undone_at instanceof Date);
+    eq([(await outbox(o.tx)).status,(await outbox(i.tx)).status],['skipped','skipped'],'the restored entries are not announced a second time');
+    const other=await put(kA,SND.nbe,ipOut('1.00','710000000041','08','08:30'));eq([sent.length,(await outbox(other.tx)).status],[1,'sent'],'only the unrelated new entry is sent')});
+  await test('audit history after the undo: merge = DELETE of each original (by Mona), undo = DELETE of the transfer (by Ahmed); the restored entries can be edited and audited normally',async()=>{
+    eq((await audits(P1.o.tx)).map(x=>[x.action,x.actor]),[['DELETE',Mona]]);eq((await audits(P1.i.tx)).map(x=>[x.action,x.actor]),[['DELETE',Mona]]);
+    const t=await audits(M1.tx);eq(t.map(x=>[x.action,x.actor,x.old_row.type,+x.old_row.amount]),[['DELETE',Ahmed,'transfer',500]]);
+    const probe=await put(kA,SND.nbe,ipOut('2.00','710000000042','08','09:00'));await as(Ahmed,"update transactions set category='Edited' where id=$1",[probe.tx]);eq((await audits(probe.tx)).map(x=>x.action),['UPDATE'])});
+  await test('after the undo: undo again (once, ten at once) → the same answer, nothing changes; both SMS still → already_imported (original entries); the pair is not suggested or mergeable again',async()=>{
+    const {o,i}=P1,n=await count(A),ni=await nImp(),b=await bal(Ahmed,A),want={status:'already_undone',out_transaction_id:o.tx,in_transaction_id:i.tx};
+    eq(await undo(Ahmed,M1.id),want);eq(await undo(Mona,M1.id),want);eq(await Promise.all(Array.from({length:10},(_,k)=>rpcAs(k%2?Ahmed:Mona,'select bank_transfer_undo($1) r',[M1.id]))),Array(10).fill(want));
+    for(const x of [o,i]){const r=await postReal(x.key,x);eq([r.status,r.transaction_id],['already_imported',x.tx]);eq((await postReal(x.key,x,{dry_run:true})).status,'already_imported')}
+    eq((await sugg(Ahmed,o,i)).length,0);eq(await confirm(Ahmed,o,i),{status:'not_eligible',reason:'declined_before'});eq((await one(Ahmed,'select bank_transfer_dismiss($1,$2) r',[o.imp,i.imp])).r,{status:'already_dismissed'});
+    eq([await count(A),await nImp(),await bal(Ahmed,A)],[n,ni,b]);eq((await cands(Ahmed)).merged.filter(x=>x.id===M1.id),[])});
+  await test('race: ten undo requests at the same moment → exactly one restores, nine report already_undone; two entries, not twenty',async()=>{
+    const o=await put(kVF,SND.vf,vfOut('430','720000000060','08','13:00')),i=await put(kMona,SND.nbe,ipIn('430.00','710000000060','08','13:02'));
+    const m=await confirm(Mona,o,i);eq(m.status,'merged','Vodafone Cash → bank, the other direction');const n=await count(A),b=await bal(Ahmed,A);
+    const rs=await Promise.all(Array.from({length:10},(_,k)=>rpcAs(k%2?Ahmed:Mona,'select bank_transfer_undo($1) r',[m.merge_id])));
+    eq(rs.map(x=>x.status).sort(),['undone',...Array(9).fill('already_undone')].sort());eq([await count(A),await bal(Ahmed,A)],[n+1,b]);
+    eq([(await row(o.tx)).type,(await row(i.tx)).type,(await row(o.tx)).wallet_id,(await row(i.tx)).wallet_id],['expense','income',WA['Personal cash'],WA['Bank account']])});
+  await test('undo is refused when the merged transfer was edited or deleted meanwhile (the books no longer contain the two originals); import protection stays',async()=>{
+    let o=await put(kA,SND.nbe,ipOut('440.00','710000000070','08','15:00')),i=await put(kMV,SND.vf,vfIn('440.00','720000000070','08','15:01')),m=await confirm(Ahmed,o,i);
+    await as(Ahmed,'update transactions set amount=441 where id=$1',[m.transaction_id]);let n=await count(A);eq(await undo(Ahmed,m.merge_id),{status:'not_eligible',reason:'transfer_changed'});eq([await count(A),await row(o.tx)],[n,null]);
+    o=await put(kA,SND.nbe,ipOut('450.00','710000000071','08','17:00'));i=await put(kMV,SND.vf,vfIn('450.00','720000000071','08','17:01'));m=await confirm(Ahmed,o,i);
+    await as(Ahmed,'delete from transactions where id=$1',[m.transaction_id]);n=await count(A);eq(await undo(Ahmed,m.merge_id),{status:'not_eligible',reason:'transfer_deleted'});eq(await count(A),n);
+    eq([(await postReal(o.key,o)).status,(await postReal(i.key,i)).status],['already_imported','already_imported']);eq(await confirm(Ahmed,o,i),{status:'already_merged',merge_id:m.merge_id,transaction_id:m.transaction_id})});
+  await test('"Not a transfer": the suggestion disappears for everyone, both entries stay as they are, it is not offered again',async()=>{
+    const o=await put(kA,SND.nbe,ipOut('460.00','710000000080','08','19:00')),i=await put(kMV,SND.vf,vfIn('460.00','720000000080','08','19:01')),n=await count(A),ro=await row(o.tx),ri=await row(i.tx);
+    await throws(()=>one(Zed,'select bank_transfer_dismiss($1,$2) r',[o.imp,i.imp]),/only the two members involved/);
+    eq((await one(Mona,'select bank_transfer_dismiss($1,$2) r',[o.imp,i.imp])).r,{status:'dismissed'});eq((await one(Ahmed,'select bank_transfer_dismiss($1,$2) r',[o.imp,i.imp])).r,{status:'already_dismissed'});
+    eq([(await sugg(Ahmed,o,i)).length,(await sugg(Mona,o,i)).length,await count(A),await row(o.tx),await row(i.tx)],[0,0,n,ro,ri]);eq(await confirm(Ahmed,o,i),{status:'not_eligible',reason:'declined_before'})});
+  await test('one member, two own wallets (bank → own Vodafone Cash): suggested and merged the same way; only that member or the owner decides',async()=>{
+    const o=await put(kMona,SND.nbe,ipOut('470.00','710000000090','08','21:00')),i=await put(kMV,SND.vf,vfIn('470.00','720000000090','08','20:58'));
+    const c=await sugg(Zed,o,i);eq([c.length,c[0].from_member,c[0].to_member,c[0].from_wallet,c[0].to_wallet,c[0].can_decide],[1,'Mona','Mona','Bank account','Household cash',false]);
+    await throws(()=>confirm(Zed,o,i),/only the two members involved/);const b=await bal(Ahmed,A);const r=await confirm(Mona,o,i);eq(r.status,'merged');
+    const t=await row(r.transaction_id);eq([t.type,t.user_id,t.wallet_id,t.to_wallet_id],['transfer',Mona,WA['Bank account'],WA['Household cash']]);eq(await bal(Ahmed,A),b)});
+  await test('negative wallet: a pair whose outgoing side overdrew the wallet can be merged and undone - balances identical each time; manual spending from that wallet stays refused',async()=>{
+    const have=(await bal(Ahmed,A))['Bank account'];const big=(Math.floor(have)+700)+'.00';
+    const o=await put(kA,SND.nbe,ipOut(big,'710000000095','11','10:00')),i=await put(kMV,SND.vf,vfIn(big,'720000000095','11','10:01'));const b=await bal(Ahmed,A);ok(b['Bank account']<0,'the import overdrew the wallet');
+    const r=await confirm(Ahmed,o,i);eq(r.status,'merged');eq(await bal(Ahmed,A),b,'merge: balances identical, still negative');
+    await throws(()=>as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'expense',1,'Manual','']),/Insufficient funds/);await throws(()=>as(Mona,INS,[A,Mona,WA['Bank account'],WA['Personal cash'],'transfer',1,'Move','']),/Insufficient funds/);
+    eq((await undo(Ahmed,r.merge_id)).status,'undone');eq(await bal(Ahmed,A),b,'undo: balances identical');await throws(()=>as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'expense',1,'Manual','']),/Insufficient funds/);
+    eq((await admin.query("select current_setting('app.bypass_balance',true) a,current_setting('app.bank_transfer_merge',true) b")).rows[0],{a:'',b:''},'no switch outlives its operation');
+    await as(Ahmed,INS,[A,Ahmed,WA['Bank account'],null,'income',-b['Bank account']+1000,'Add income',''])});
+  await test('an import arriving while a confirmation is in progress waits for it; unrelated manual entries are not blocked by suggestions',async()=>{
+    const o=await put(kA,SND.nbe,ipOut('480.00','710000000097','11','12:00')),i=await put(kMV,SND.vf,vfIn('480.00','720000000097','11','12:01'));
+    const [m,late]=await Promise.all([rpcAs(Ahmed,'select bank_transfer_confirm($1,$2) r',[o.imp,i.imp]),postReal(kVF,{sender:SND.vf,text:vfIn('480.00','720000000098','11','12:03')})]);
+    ok(late.status==='imported'&&(m.status==='merged'||m.status==='not_eligible'),JSON.stringify([m,late]));
+    const tr=+(await admin.query("select count(*) n from transactions where type='transfer' and note like '%710000000097%'")).rows[0].n;eq(tr,m.status==='merged'?1:0,'either merged before the rival arrived, or refused as ambiguous - never half');
+    eq((await as(Mona,INS,[A,Mona,WA['Household cash'],null,'expense',1,'Tea',''])).rows.length,1)});
 
   console.log('\nLogging and clean-up');
   await test('logs: outcome, rule, reason and hashed identifiers only - never the SMS text, a name, a key or the service key',async()=>{

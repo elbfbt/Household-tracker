@@ -203,6 +203,34 @@ income. Entries typed into the app keep the normal "Insufficient funds" rule, so
 from by hand until it is topped up; further bank imports are still recorded. Only the import function can do this,
 for its single entry; the database rule itself, the constraints and RLS are unchanged.
 
+### Transfers between two wallets of the household (suggest, then confirm)
+
+When one member sends money to another member (or to their own second wallet) and both phones import their
+message, the books first show an expense on one wallet and an income on the other. The two messages share no
+identifier, so nothing is merged automatically. The app only **suggests** a pair when all of this holds: same
+household, one verified outgoing-transfer import and one verified incoming-transfer import, two different wallets
+(taken from the import keys), exactly the same amount, message times at most 15 minutes apart, neither entry edited
+or deleted, and no other possible pairing on either side. Ambiguous cases and one-sided imports are left alone - a
+transfer to someone outside the household stays an expense.
+
+The Home screen shows a card "Possible internal transfer" with two buttons (for the two members involved and the
+household owner):
+
+- **Merge into one transfer** - `bank_transfer_confirm`: one atomic operation that replaces the two entries by one
+  entry of the existing type *Transfer* (wallet A → wallet B). Wallet balances are identical before and after; the
+  amount no longer counts as income or expense. No notification is sent for it. Sending either SMS again still
+  answers `already_imported`.
+- **Not a transfer** - `bank_transfer_dismiss`: the pair is not offered again; nothing changes.
+
+A merge of the last 7 days shows **Undo merge** (`bank_transfer_undo`): the two original entries come back with the
+same ids, creator, wallet, amount, description, note and time; the same import records point at them again. Undo is
+refused if the merged transfer was edited or deleted in the meantime. An undone pair is not suggested again.
+Decisions are kept in the table `bank_transfer_merges` (who, when, the complete original rows).
+
+One existing database function is touched for this: `tx_before()` gets a single added condition so that these two
+operations may re-create an entry in the name of its original creator; for entries made in the app the rule
+"you can only create entries for yourself" is unchanged.
+
 ### What becomes what
 
 | Message | App transaction | Wallets |
