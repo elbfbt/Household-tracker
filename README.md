@@ -96,3 +96,31 @@ icon chooser. "Edit prices" also shows a × on each tile to remove it (past tran
 - No private OneSignal key is in the repository. Sending notifications from the backend would need the REST API key
   in a server-side secret (e.g. a Supabase Edge Function), never in this frontend.
 - Tests: `npm test` → unit 23, database 32, UI 35.
+
+## Version 8 — Household-only transaction notifications (stage 1)
+
+When a transaction is **committed** in the database, the members of *that* household get a push notification.
+
+**Setup (once)**
+1. SQL editor: run `010 transaction notifications.sql` (after 009).
+2. Edge Functions: deploy `supabase/functions/notify-transactions/index.ts` under the name `notify-transactions`
+   (dashboard editor: create function → paste the file; or `supabase functions deploy notify-transactions`).
+   Keep "Verify JWT" on.
+3. Edge Functions → Secrets: add `ONESIGNAL_REST_API_KEY` (OneSignal → Settings → Keys & IDs → REST API key).
+   Optional secrets: `NOTIFY_SKIP_CREATOR=true` (do not notify the person who made the entry), `APP_URL`.
+
+**How it works**
+- Trigger `tx_notify_outbox` (AFTER INSERT on `transactions`) writes one row to `notification_outbox` inside the
+  same database transaction. Rejected / rolled-back entries leave nothing; `transaction_id` is unique.
+- After its entries were saved, the app calls the Edge Function with the user's login token and **no parameters**.
+  The function asks Supabase Auth who is calling, then `push_claim()` hands out the due rows of the caller's
+  household(s) — each exactly once — with the devices of the *current* members (`members` ⨝ `push_devices`).
+- `push_devices` maps a OneSignal subscription (one browser/phone) to the signed-in user. The app registers it
+  after login (`register_push_device`), removes it at log-out (`unregister_push_device`); a subscription has one
+  owner; rows disappear with a deleted account. The OneSignal external id is also set to the Supabase user id.
+- OneSignal errors are recorded in `notification_outbox.error`; the transaction is never touched. Rows nobody
+  delivered within 15 minutes are skipped (no late alerts). Failed sends are not retried (no duplicates).
+- Neither table is reachable from the browser; `push_claim` / `push_done` are service-role only.
+
+**Tests:** `npm test` → unit 23, database 32, notifications 21 (real Postgres + the real function code + a
+stand-in OneSignal), UI 44.

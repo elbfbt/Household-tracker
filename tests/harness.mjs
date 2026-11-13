@@ -2,7 +2,7 @@
 // so the repository's actual migrations, triggers and RLS policies are what gets tested.
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {fileURLToPath} from 'node:url';
 export const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-export const MIGRATIONS=['schema.sql','002_analytics.sql','003_wallets_offline.sql','004 fix withdraw.sql','005 integrity security.sql','006 funds members quickitems.sql','007 account deletion quickitems.sql','008 delete fix deleted users.sql','009 quick purchase catalog.sql'];
+export const MIGRATIONS=['schema.sql','002_analytics.sql','003_wallets_offline.sql','004 fix withdraw.sql','005 integrity security.sql','006 funds members quickitems.sql','007 account deletion quickitems.sql','008 delete fix deleted users.sql','009 quick purchase catalog.sql','010 transaction notifications.sql'];
 let pass=0,fail=0;const fails=[];
 export async function test(name,fn){try{await fn();pass++;console.log('  ok   '+name)}catch(e){fail++;fails.push(name);console.log('  FAIL '+name+'\n       '+String(e&&e.stack||e).split('\n').slice(0,4).join('\n       '))}}
 export function eq(a,b,m=''){const x=JSON.stringify(a),y=JSON.stringify(b);if(x!==y)throw new Error(`${m} expected ${y}, got ${x}`)}

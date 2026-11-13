@@ -50,7 +50,7 @@ class Query{constructor(t){this.t=t;this.f=[];this.op='select';this.ord=[]}
     const name=u=>{const x=d.users.find(y=>y.id===u);return x&&member(d,(d.members.find(m=>m.user_id===me)||{}).household_id,u)?{name:x.name}:null};
     if(this.op==='insert'){const r=this.row;if(d.transactions.some(x=>x.client_id===r.client_id))return{data:null,error:null,status:201};
       if(!member(d,r.household_id,me)||r.user_id!==me)return{data:null,error:{message:'new row violates row-level security policy',code:'42501'},status:403};
-      const now=new Date().toISOString(),row={id:uuid(),...r,updated_at:now};d.transactions.push(row);const e=funds(d,null,row);if(e)return{data:null,error:e,status:400};save(d);return{data:null,error:null,status:201}}
+      const now=new Date().toISOString(),row={id:uuid(),...r,updated_at:now};d.transactions.push(row);const e=funds(d,null,row);if(e)return{data:null,error:e,status:400};(d.outbox=d.outbox||[]).push({tx:row.id,household_id:row.household_id,status:'pending'});save(d);return{data:null,error:null,status:201}}
     let rows=d[this.t].filter(vis).filter(r=>this.f.every(f=>f(r)));
     if(this.op==='delete'){if(this.t!=='quick_items')rows=rows.filter(r=>r.user_id===me||member(d,r.household_id,me).role==='owner');d[this.t]=d[this.t].filter(r=>!rows.includes(r));save(d);return{data:rows.map(r=>({id:r.id})),error:null,status:200}}
     if(this.op==='update'){if(this.t==='quick_items'){rows.forEach(r=>Object.assign(r,this.patch));save(d);return{data:rows,error:null,status:200}}
@@ -79,8 +79,15 @@ const RPC={
   join_household(d,me,{code}){const h=d.households.find(x=>x.invite_code===code.trim().toLowerCase());if(!h)throw{message:'invalid invitation code'};if(!member(d,h.id,me))d.members.push({household_id:h.id,user_id:me,role:'member'});return h.id},
   delete_my_account(d,me){if(d.members.some(m=>m.user_id===me&&m.role==='owner'&&d.members.some(o=>o.household_id===m.household_id&&o.user_id!==me)))throw{message:'You own a household that still has other members. Remove them, or delete the household (Household > Delete Household), before deleting your account.'};
     d.users=d.users.filter(u=>u.id!==me);d.members=d.members.filter(m=>m.user_id!==me);d.transactions.forEach(t=>{if(t.user_id===me)t.user_id=null});return null},
+  register_push_device(d,me,{sub,lng}){d.push_devices=(d.push_devices||[]).filter(x=>x.subscription_id!==sub);d.push_devices.push({subscription_id:sub,user_id:me,lang:lng||'en'});return null},
+  unregister_push_device(d,me,{sub}){d.push_devices=(d.push_devices||[]).filter(x=>!(x.subscription_id===sub&&x.user_id===me));return null},
   remove_member(d,me,{h,uid:u}){d.members=d.members.filter(m=>!(m.household_id===h&&m.user_id===u));return null}};
 window.supabase={createClient(){return{auth,from:t=>new Query(t),
+  /* Edge Function stand-in: like the real one it takes no parameters, claims each pending outbox row of the caller's household once, and "sends" to the devices of that household's members */
+  functions:{invoke:async(n,o)=>{if(!await wire('fn '+n))return{data:null,error:{message:'Failed to send a request to the Edge Function'}};const d=db(),me=uid();if(!me)return{data:null,error:{message:'not signed in'}};
+    if(JSON.parse(localStorage.getItem('mock_cfg')||'{}').pushFail)return{data:null,error:{message:'Edge Function returned a non-2xx status code'}};
+    const hs=d.members.filter(m=>m.user_id===me).map(m=>m.household_id);let c=0;(d.outbox||[]).forEach(x=>{if(x.status==='pending'&&hs.includes(x.household_id)){x.status='sent';c++;
+      (d.pushes=d.pushes||[]).push({tx:x.tx,body:o&&o.body,to:(d.push_devices||[]).filter(p=>d.members.some(m=>m.household_id===x.household_id&&m.user_id===p.user_id)).map(p=>p.subscription_id).sort()})}});save(d);return{data:{claimed:c},error:null}}},
   rpc(n,a){return{then(x,y){return(async()=>{if(!await wire('rpc '+n))return netFail();const d=db(),me=uid();if(!me)return{data:null,error:{message:'JWT expired',code:'PGRST301'},status:401};
     try{const r=RPC[n](d,me,a||{});if(r&&r.__err)return{data:null,error:r.__err,status:r.__status};save(d);return{data:r,error:null,status:200}}catch(e){return{data:null,error:e,status:400}}})().then(x,y)}}},
   channel(){const c={on(){return c},subscribe(f){setTimeout(()=>f&&f('SUBSCRIBED'),5);return c}};return c},removeChannel(){}}}};

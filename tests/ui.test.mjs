@@ -329,10 +329,10 @@ await test('iPad landscape (two columns): nothing overlaps the Recent column; Ar
 
 console.log('\nPush notifications (OneSignal)');
 /* cdn.onesignal.com is answered with a small stand-in that records how the app drives the SDK (the real SDK needs the real site address) */
-const STUB=`(()=>{const L=window.__os={init:[],calls:[],perm:false,opted:false,native:'default'};const ev={addEventListener(){}};
- const OneSignal={init:async o=>{L.init.push(o)},Notifications:{get permission(){return L.perm},get permissionNative(){return L.native},isPushSupported:()=>!L.unsupported,
+const STUB=`(()=>{const L=window.__os=Object.assign({init:[],calls:[],perm:false,opted:false,native:'default',sub:'aaaaaaaa-0000-4000-8000-000000000001'},JSON.parse(localStorage.getItem('__os')||'{}'));const ev={addEventListener(){}};
+ const OneSignal={init:async o=>{L.init.push(o)},login:async id=>{L.calls.push('login:'+id);L.ext=id},logout:async()=>{L.calls.push('logout');L.ext=null},Notifications:{get permission(){return L.perm},get permissionNative(){return L.native},isPushSupported:()=>!L.unsupported,
    requestPermission:async()=>{L.calls.push('requestPermission');if(L.deny){L.native='denied'}else{L.perm=true;L.native='granted'}},addEventListener(){}},
-  User:{PushSubscription:{get optedIn(){return L.opted},optIn:async()=>{L.calls.push('optIn');L.opted=true},optOut:async()=>{L.calls.push('optOut');L.opted=false},addEventListener(){}}}};
+  User:{setLanguage:l=>{L.lang=l},PushSubscription:{get id(){return L.sub},get optedIn(){return L.opted},optIn:async()=>{L.calls.push('optIn');L.opted=true},optOut:async()=>{L.calls.push('optOut');L.opted=false},addEventListener(){}}}};
  const run=f=>Promise.resolve().then(()=>f(OneSignal));const q=window.OneSignalDeferred||[];window.OneSignalDeferred={push:run};q.forEach(run)})()`;
 const withSdk=async(p,mode)=>{await p.page.setRequestInterception(true);p.page.on('request',r=>{if(/onesignal\.com/.test(r.url())){mode==='block'?r.abort():r.respond({status:200,contentType:'text/javascript',body:STUB})}else r.continue()})};
 const menu=async p=>{await p.page.click('#gear');await p.wait(()=>!document.querySelector('#menu').hidden)};
@@ -344,8 +344,8 @@ await test('SDK loads after the app, initialises once with the App ID, Safari ID
   eq(await p.text('#bal'),'EGP 730.00');noErr(p);await p.close()});
 await test('permission flow from the settings menu: prompt → subscribed → can be turned off again; nothing is asked before the tap',async()=>{
   const p=await open({uid:O});await withSdk(p);await p.go();await p.dash();await p.wait(()=>window.__os&&window.__os.init.length===1);
-  eq(await p.page.evaluate(()=>window.__os.calls),[],'no prompt on load:');await menu(p);await p.wait(()=>!document.querySelector('#pn').hidden);eq(await p.text('#pn'),'Turn on notifications');
-  await p.page.click('#pn');await p.wait(()=>window.__os.opted);eq(await p.page.evaluate(()=>window.__os.calls),['requestPermission','optIn']);ok(/are on/.test(await p.toast()));
+  eq(await p.page.evaluate(()=>window.__os.calls.filter(c=>!c.startsWith('login'))),[],'no prompt on load:');await menu(p);await p.wait(()=>!document.querySelector('#pn').hidden);eq(await p.text('#pn'),'Turn on notifications');
+  await p.page.click('#pn');await p.wait(()=>window.__os.opted);eq(await p.page.evaluate(()=>window.__os.calls.filter(c=>!c.startsWith('login'))),['requestPermission','optIn']);ok(/are on/.test(await p.toast()));
   await menu(p);eq(await p.text('#pn'),'Notifications: On');await p.page.click('#pn');await p.wait(()=>!window.__os.opted);ok(/are off/.test(await p.toast()));noErr(p);await p.close()});
 await test('permission refused → clear message, no subscription; Arabic labels',async()=>{
   const p=await open({uid:O,lang:'ar'});await withSdk(p);await p.go();await p.dash();await p.wait(()=>window.__os&&window.__os.init.length===1);await p.page.evaluate(()=>{window.__os.deny=true});
@@ -357,14 +357,63 @@ await test('OneSignal unreachable (offline / blocked): the app is unaffected and
   await menu(p);ok(await p.page.$eval('#pn',e=>e.hidden));ok(await p.page.evaluate(()=>window.HTPush.state()===null));
   await p.page.click('#menu #ac');await p.wait(()=>!document.querySelector('#more').hidden);noErr(p);await p.close()});
 
+console.log('\nHousehold transaction notifications (client side)');
+const subscribed=p=>p.page.evaluateOnNewDocument(()=>{if(!localStorage.getItem('__os'))localStorage.setItem('__os',JSON.stringify({perm:true,opted:true,native:'granted'}))});
+const SUB='aaaaaaaa-0000-4000-8000-000000000001';
+const fnCalls=p=>p.page.evaluate(()=>window.__calls.filter(c=>c.name==='fn notify-transactions').length);
+await test('login identity: OneSignal external id = Supabase user id, and the device is registered to that user in the database',async()=>{
+  const p=await open({uid:M,lang:'ar'});await subscribed(p);await withSdk(p);await p.go();await p.dash();
+  await p.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).some(d=>d.subscription_id===s),SUB);
+  eq(await p.page.evaluate(()=>[window.__os.calls.filter(c=>c.startsWith('login')),window.__os.lang]),[['login:'+M],'ar']);
+  eq((await p.db()).push_devices,[{subscription_id:SUB,user_id:M,lang:'ar'}]);eq(await fnCalls(p),0,'nothing is sent just by opening the app:');noErr(p);await p.close()});
+await test('a device that has not allowed notifications is not registered',async()=>{
+  const p=await open({uid:M});await withSdk(p);await p.go();await p.dash();await p.wait(()=>window.__os&&window.__os.calls.some(c=>c.startsWith('login')));await sleep(300);
+  eq((await p.db()).push_devices||[],[]);await menu(p);await p.wait(()=>!document.querySelector('#pn').hidden);await p.page.click('#pn');
+  await p.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).some(d=>d.subscription_id===s),SUB);
+  await menu(p);await p.page.click('#pn');await p.wait(()=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).length===0);noErr(p);await p.close()});
+await test('online entry: the notify function is called only after the entry is saved, with no parameters; one notification',async()=>{
+  const p=await open({uid:M});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);const n0=(await p.db()).transactions.length;
+  await addExpense(p,5,'Gum');await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(()=>(JSON.parse(localStorage.getItem('mock_db')).pushes||[]).length===1);
+  const d=await p.db(),t=d.transactions.at(-1);eq(d.pushes,[{tx:t.id,body:{},to:[SUB]}]);
+  const order=await p.page.evaluate(()=>window.__calls.map(c=>c.name).filter(n=>n==='insert transactions'||n==='fn notify-transactions'));eq(order,['insert transactions','fn notify-transactions']);noErr(p);await p.close()});
+await test('offline entry: nothing is sent while it only exists on the phone; after it syncs exactly one notification; later syncs / reloads add none',async()=>{
+  const p=await open({uid:M});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);const n0=(await p.db()).transactions.length;
+  await p.net(false);await p.status(/Offline/);await addExpense(p,7,'Offline tea');await p.wait(()=>[...document.querySelectorAll('#tl .tm b')].some(b=>b.textContent==='Offline tea'));await sleep(400);
+  eq([await fnCalls(p),((await p.db()).pushes||[]).length,(await p.db()).transactions.length],[0,0,n0],'offline: no call, no notification, nothing on the server:');
+  await p.net(true);await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(()=>(JSON.parse(localStorage.getItem('mock_db')).pushes||[]).length===1);
+  await p.page.evaluate(()=>localStorage.removeItem('__offline'));await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.status(/Online/);await sleep(400);
+  const d=await p.db();eq([d.transactions.length,d.pushes.length,d.outbox.filter(o=>o.status==='pending').length],[n0+1,1,0]);noErr(p);await p.close()});
+await test('entry rejected by the server: no notification; notify function failing: the entry stays saved and no error is shown',async()=>{
+  const p=await open({uid:M,cfg:{pushFail:true}});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.status(/Online/);const n0=(await p.db()).transactions.length;
+  await addExpense(p,99999,'Too much',WP);await p.wait(()=>/Insufficient funds/.test(document.querySelector('#toast')?.textContent||''));eq([await fnCalls(p),(await p.db()).transactions.length],[0,n0]);
+  await sleep(4800);await addExpense(p,5,'Gum');await p.wait(n=>JSON.parse(localStorage.getItem('mock_db')).transactions.length===n+1,n0);await p.wait(()=>window.__calls.some(c=>c.name==='fn notify-transactions'));await sleep(300);
+  eq(await p.toast(),'','no error toast for a notification problem:');eq(((await p.db()).pushes||[]).length,0);ok((await p.text('#tl')).includes('Gum'));
+  eq(p.errors.filter(e=>!/notifications:/.test(e)),[]);await p.close()});
+await test('log out, then another account logs in on the same phone: device is released, then belongs to the new account only',async()=>{
+  const p=await open({uid:M});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).length===1);
+  await menu(p);await p.page.click('#lo');await p.wait(()=>!!document.querySelector('#em'));
+  eq((await p.db()).push_devices,[],'device row removed at log-out:');
+  await p.wait(()=>window.__os&&window.__os.init.length===1);eq(await p.page.evaluate(()=>[window.__os.calls.at(-1),window.__os.ext]),['logout',null],'logged out: no identity:');
+  await p.page.type('#em','owner@t.io');await p.page.type('#pw','secret1');await p.page.click('#go');await p.dash();
+  await p.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).length===1);eq((await p.db()).push_devices,[{subscription_id:SUB,user_id:O,lang:'en'}]);
+  eq(await p.page.evaluate(()=>[window.__os.calls.filter(c=>c.startsWith('login')).at(-1),window.__os.ext]),['login:'+O,O]);noErr(p);await p.close()});
+await test('log-out order: the server forgets the device BEFORE the session ends, then OneSignal forgets the user; offline log-out switches push off locally',async()=>{
+  const p=await open({uid:M});await subscribed(p);await withSdk(p);await p.go();await p.dash();await p.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).length===1);
+  await p.page.evaluate(()=>{const o=window.__os,keep=k=>sessionStorage.setItem('__seq',(sessionStorage.getItem('__seq')||'')+k+',');const lo=o.calls.push.bind(o.calls);o.calls.push=x=>{keep('os:'+x);return lo(x)};const c=window.__calls,cp=c.push.bind(c);c.push=x=>{keep(x.name);return cp(x)}});
+  await menu(p);await p.page.click('#lo');await p.wait(()=>!!document.querySelector('#em'));
+  const seq=(await p.page.evaluate(()=>sessionStorage.getItem('__seq'))).split(',').filter(x=>/unregister|os:logout|signOut/.test(x));eq(seq,['rpc unregister_push_device','os:logout','auth.signOut']);await p.close();
+  const q=await open({uid:M});await subscribed(q);await withSdk(q);await q.go();await q.dash();await q.wait(s=>(JSON.parse(localStorage.getItem('mock_db')).push_devices||[]).length===1);
+  await q.net(false);await q.status(/Offline/);await menu(q);await q.page.click('#lo');await q.wait(()=>localStorage.getItem('ht_push_reopt')==='1',null,9000);
+  eq(await q.page.evaluate(()=>localStorage.getItem('ht_push_reopt')),'1');await q.close()});
+
 console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v9'))return false;const c=await caches.open('ht-v9');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v10'))return false;const c=await caches.open('ht-v10');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
-  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v9');await new Promise(r=>setTimeout(r,200));
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v10');await new Promise(r=>setTimeout(r,200));
     return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
       cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
   eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');
