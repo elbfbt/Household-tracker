@@ -213,18 +213,8 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* quick purchases + template picker: quick ease-out entrance, 30 ms stagger; calm, no bounce */
 @keyframes qcIn{from{opacity:0;transform:translateY(8px)}}
-#qi .qc:not(.pend),#qsl .tpl button{animation:qcIn var(--dur-2) var(--ease-out) both}
-#qi .qc:nth-child(2),#qsl .tpl button:nth-child(2){animation-delay:30ms}
-#qi .qc:nth-child(3),#qsl .tpl button:nth-child(3){animation-delay:60ms}
-#qi .qc:nth-child(4),#qsl .tpl button:nth-child(4){animation-delay:90ms}
-#qi .qc:nth-child(5),#qsl .tpl button:nth-child(5){animation-delay:120ms}
-#qi .qc:nth-child(6),#qsl .tpl button:nth-child(6){animation-delay:150ms}
-#qi .qc:nth-child(7),#qsl .tpl button:nth-child(7){animation-delay:180ms}
-#qi .qc:nth-child(8),#qsl .tpl button:nth-child(8){animation-delay:210ms}
-#qi .qc:nth-child(9),#qsl .tpl button:nth-child(9){animation-delay:240ms}
-#qi .qc:nth-child(10),#qsl .tpl button:nth-child(10){animation-delay:270ms}
-#qi .qc:nth-child(11),#qsl .tpl button:nth-child(11){animation-delay:300ms}
-#qi .qc:nth-child(12){animation-delay:330ms}
+/* entrance plays ONCE, at node creation (renderQuick adds .in only when an item genuinely enters) */
+#qi .qc.in,#qsl .tpl button.in{animation:qcIn var(--dur-2) var(--ease-out) both;animation-delay:calc(var(--i,0)*30ms)}
 /* sheets: backdrop fade + quick ease-out entrance (existing behaviour, formalised) */
 .sheet.on{animation:fade var(--dur-2)}
 .sheet>div{animation:up var(--dur-3) var(--ease-out)}
@@ -237,6 +227,18 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--
 .empty b{font-size:var(--t-body);font-weight:var(--w-bold)}
 .empty small{font-size:var(--t-small);color:var(--text-2);max-width:30ch}
 #qi .empty{margin-bottom:10px}
+
+/* ===== optical alignment: corrections a human eye asks for, not pixel arithmetic ===== */
+/* the status dot shares the text's optical centre instead of sitting on its baseline */
+#net{display:inline-flex;align-items:center;gap:6px}
+.dot{margin-inline-end:0}
+/* icon stroke compensation: 16-18px outline icons need a touch more weight than the 22px standard
+   to look equal; the 20px close (2.2) and 15px plus (2.6) already follow the same rule */
+.pill svg,.go svg,.link.ul svg{stroke-width:2}
+/* money columns keep their digits column-aligned (no jitter when numbers change) */
+.kp b,.bl,#prow b{font-variant-numeric:tabular-nums}
+/* the delete × sits on its optical centre in the row, not on the font baseline */
+.x{display:grid;place-items:center;line-height:1}
 </style></head><body><main id="app"><div id="boot" style="position:relative;isolation:isolate"><div class="hdbg" aria-hidden="true"></div><header class="top"><div class="brand"><span class="logo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 21v-8a1.5 1.5 0 013 0v8zM10.5 21V5a1.5 1.5 0 013 0v16zM17 21V10a1.5 1.5 0 013 0v11z"/></svg></span><b>Household Tracker</b></div><span class="st"><span class="sync"><i class="dot"></i><span id="bootmsg">Loading…</span></span></span></header><div id="bootsk" hidden><div class="sk skh"></div><div class="skw"><i class="sk"></i><i class="sk"></i></div><div class="sk skc"></div><div class="sk skt"></div><div class="sk skt"></div></div></div></main>
 <script>/* returning user: show the dashboard-shaped shell immediately (the real cached numbers replace it as soon as the app script runs) */
 try{if(localStorage.getItem('ht_lang')==='ar'){document.documentElement.lang='ar';document.documentElement.dir='rtl';document.getElementById('bootmsg').textContent='جارٍ التحميل…'}
@@ -479,10 +481,61 @@ function quickAll(){const q=Q();return[...items.map(i=>{const p=q.find(o=>pq(o)&
 function quickFind(name){const n=String(name).trim().toLowerCase();return quickAll().find(i=>Core.qname(i,LG).trim().toLowerCase()===n||String(i.name).trim().toLowerCase()===n)||null}
 function quickSave(name,price,icon){const ex=quickFind(name),b=ex&&Core.qbuiltin(ex);
   Qo.push({op:'qi',household_id:hh.id,name:ex?ex.name:name,key:b?b.key:null,icon:icon||null,price});return ex}
+
+/* ---- Quick Purchases rendering: keyed reconciliation ----
+   A save paints the app THREE times (optimistic paint; flush() completes -> load() -> paint; the realtime
+   INSERT -> loadSoon -> load -> paint). The former renderer replaced the whole grid whenever a computed HTML
+   string differed - and that comparison could never succeed: the template writes bare `data-nt` attributes,
+   which the DOM re-serializes as `data-nt=""`, so EVERY paint rebuilt the grid and replayed every entrance
+   animation (in Arabic the auto-translator also rewrote the un-marked label after insertion). Now the DOM is
+   reconciled against the DATA, at the render boundary: an item node lives as long as the item does; unchanged
+   data touches nothing (immune to serialization/translation), a changed item updates in place, only genuinely
+   new items are created and only those play the one-time entrance animation. */
+const qiDom=new Map();      /* item key -> node (a node lives as long as its item) */
+const qiSigs=new Map();     /* item key -> rendered signature (what the node shows) */
+const qiSeen=new Set();     /* item keys that already had their entrance (never replayed) */
+let qiMap=new Map(),qiHost=null;
+const qiKeyOf=i=>i.key?'k:'+i.key:'n:'+String(i.name||'').trim().toLowerCase();
+const qiSigOf=i=>[i.pending?1:0,String(i.id),String(i.icon||''),Core.qname(i,LG),fmt(i.default_price),edit?1:0].join('\u0001');
+const qiInner=i=>`<span class="qe" data-nt>${Core.qicon(i)}</span><span><b data-nt dir="auto">${esc(Core.qname(i,LG))}</b><small data-nt>${fmt(i.default_price)}</small></span>${edit&&!i.pending?`<span class="qdel" data-del="${i.id}" role="button" aria-label="Delete">×</span>`:''}`;
+function renderQuick(){
+  const el=document.querySelector('#qi');if(!el)return;
+  const qiAll=quickAll();
+  if(!haveData&&!qiAll.length){qiHost=el;qiDom.clear();qiSigs.clear();qiSeen.clear();qiMap=new Map();el.innerHTML='<div class="sk skt"></div><div class="sk skt"></div>';el.onclick=qiClick;return}
+  if(qiHost!==el){qiHost=el;qiDom.clear();qiSigs.clear();qiMap=new Map()}   /* qiSeen survives: returning to Home must not re-animate */
+  qiMap=new Map(qiAll.map(i=>[qiKeyOf(i),i]));
+  let emptyEl=el.querySelector('.qempty');
+  if(haveData&&!qiAll.length&&!emptyEl){emptyEl=document.createElement('div');emptyEl.className='empty qempty';
+    emptyEl.innerHTML=`<span class="ei">${svg('cart')}</span><b>${T('No quick purchases yet')}</b><small>${T('Add your commonly purchased items for faster entry.')}</small>`}
+  else if((!haveData||qiAll.length)&&emptyEl){emptyEl.remove();emptyEl=null}
+  const firstPop=!qiSeen.size,keep=new Set(),order=[];
+  qiAll.forEach((i,ix)=>{const k=qiKeyOf(i);if(keep.has(k))return;keep.add(k);
+    let n=qiDom.get(k),sig=qiSigOf(i);
+    if(!n){n=document.createElement('button');n.className='qc in'+(i.pending?' pend':'');n.dataset.k=k;n.dataset.i=i.id;
+      n.style.setProperty('--i',String(firstPop?ix:0));n.innerHTML=qiInner(i);qiDom.set(k,n);qiSeen.add(k)}
+    else{if(qiSigs.get(k)!==sig){n.className='qc in'+(i.pending?' pend':'');n.innerHTML=qiInner(i)}   /* in place: no re-animation */
+      if(n.dataset.i!==String(i.id))n.dataset.i=i.id}
+    qiSigs.set(k,sig);order.push(n)});
+  [...qiDom].forEach(([k,n])=>{if(!keep.has(k)){qiDom.delete(k);qiSigs.delete(k);qiSeen.delete(k);n.remove()}});
+  let add=el.querySelector('#qadd');
+  if(haveData&&!add){add=document.createElement('button');add.className='qc add';add.id='qadd';add.innerHTML=`<span class="qe">${svg('plus')}</span><span><b>${T('Add item')}</b></span>`}
+  else if(!haveData&&add){add.remove();add=null}
+  const want=[...(emptyEl?[emptyEl]:[]),...order,...(add?[add]:[])];
+  want.forEach((n,ix)=>{const cur=el.children[ix];if(cur!==n)el.insertBefore(n,cur||null)});   /* move only what is out of place */
+  [...el.children].slice(want.length).forEach(n=>n.remove());                                  /* stale extras (e.g. boot skeletons) */
+  el.onclick=qiClick}
+function qiClick(e){
+  const b=e.target.closest('[data-k]');
+  if(!b){if(e.target.closest('#qadd'))openTemplates();return}
+  const it=qiMap.get(b.dataset.k);if(!it)return;const nm=Core.qname(it,LG);
+  if(e.target.closest('[data-del]')){if(!navigator.onLine)return notify(T('This needs an internet connection.'),true);
+    if(confirm(T('Remove from Quick Purchases?')+' '+nm+'\n'+T('Past transactions are not affected.')))sb.from('quick_items').delete().eq('id',it.id).then(r=>{if(r.error)notify(T('Could not remove')+': '+r.error.message,true,true);load()});return}
+  if(edit){if(it.pending)return;const p=prompt(T('Default price for')+' '+nm,it.default_price);if(p!==null&&p!==''&&num(p)>=0)sb.from('quick_items').update({default_price:Math.round(num(p)*100)/100}).eq('id',it.id).then(r=>{if(r.error)notify(T('Could not save the price')+': '+r.error.message,true,true);load()})}
+  else openSheet('expense',it.name,it.default_price)}
 const GROUPS=[['bread','bread'],['veg','vegetables'],['fruit','fruits'],['food','']];
-function openTemplates(){const s=$('#qs');
-  const draw=()=>{const have=quickAll();$('#qsl').innerHTML=GROUPS.map(([g,l])=>`<div class="grp"${l?' data-nt':''}>${l?esc(Core.qname({key:l},LG)):'Food & groceries'}</div><div class="tpl">${Core.CATALOG.filter(c=>c.group===g).map(c=>{const on=have.some(i=>{const b=Core.qbuiltin(i);return b&&b.key===c.key});
-      return `<button data-k="${c.key}" ${on?'disabled':''}><span data-nt>${c.emoji}</span><span data-nt dir="auto">${esc(LG==='ar'?c.ar:c.en)}</span><small>${on?'✓':fmt(c.price)}</small></button>`}).join('')}</div>`).join('');
+function openTemplates(){const s=$('#qs');let fresh=true;
+  const draw=()=>{const have=quickAll();$('#qsl').innerHTML=GROUPS.map(([g,l])=>`<div class="grp"${l?' data-nt':''}>${l?esc(Core.qname({key:l},LG)):'Food & groceries'}</div><div class="tpl">${Core.CATALOG.filter(c=>c.group===g).map((c,ix)=>{const on=have.some(i=>{const b=Core.qbuiltin(i);return b&&b.key===c.key});
+      return `<button class="${fresh?'in':''}" style="--i:${ix}" data-k="${c.key}" ${on?'disabled':''}><span data-nt>${c.emoji}</span><span data-nt dir="auto">${esc(LG==='ar'?c.ar:c.en)}</span><small data-nt>${on?'✓':fmt(c.price)}</small></button>`}).join('')}</div>`).join('');fresh=false;
     $('#qsl').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const c=Core.catByKey(b.dataset.k),p=prompt(T('Default price for')+' '+(LG==='ar'?c.ar:c.en),c.price);if(p===null||p==='')return;
       const price=Math.round(num(p)*100)/100;if(!(price>=0&&price<1e9))return notify(T('Enter a default price'),true);
       Qo.push({op:'qi',household_id:hh.id,name:c.en,key:c.key,icon:null,price});warnStore();draw();paint();flush()})};
@@ -517,19 +570,9 @@ function paint(){
   document.querySelectorAll('#prow>div').forEach(d=>d.classList.toggle('on',d.dataset.p===pr));       // the period chip emphasises one of the three figures
   $('#wb').innerHTML=wallets.map(w=>{const v=fmt(P.wallets[w.id]);return `<div class="wc"><span class="wi">${svg(wicon(w.name))}</span><span class="wt"><small data-nt dir="auto">${esc(xT(w.name))}</small><b class="${P.wallets[w.id]<0?'neg':''}" dir="auto">${v}</b></span></div>`}).join('');fitText();
   paintXfer();
-  const qiAll=quickAll();
-  const qh=(haveData&&!qiAll.length?`<div class="empty qempty"><span class="ei">${svg('cart')}</span><b>${T('No quick purchases yet')}</b><small>${T('Add your commonly purchased items for faster entry.')}</small></div>`:'')+qiAll.map(i=>`<button class="qc${i.pending?' pend':''}" data-i="${i.id}"><span class="qe" data-nt>${Core.qicon(i)}</span><span><b data-nt dir="auto">${esc(Core.qname(i,LG))}</b><small>${fmt(i.default_price)}</small></span>${edit&&!i.pending?`<span class="qdel" data-del="${i.id}" role="button" aria-label="Delete">×</span>`:''}</button>`).join('')
-    +(haveData?`<button class="qc add" id="qadd"><span class="qe">${svg('plus')}</span><span><b>Add item</b></span></button>`:'');
-  if($('#qi').innerHTML!==qh)$('#qi').innerHTML=qh;
-  if($('#qadd'))$('#qadd').onclick=openTemplates;
-  $('#qi').querySelectorAll('[data-i]').forEach(b=>b.onclick=e=>{const it=qiAll.find(x=>x.id===b.dataset.i);if(!it)return;const nm=Core.qname(it,LG);
-    if(e.target.closest('[data-del]')){if(!navigator.onLine)return notify(T('This needs an internet connection.'),true);
-      if(confirm(T('Remove from Quick Purchases?')+' '+nm+'\n'+T('Past transactions are not affected.')))sb.from('quick_items').delete().eq('id',it.id).then(r=>{if(r.error)notify(T('Could not remove')+': '+r.error.message,true,true);load()});return}
-    if(edit){if(it.pending)return;const p=prompt(T('Default price for')+' '+nm,it.default_price);if(p!==null&&p!==''&&num(p)>=0)sb.from('quick_items').update({default_price:Math.round(num(p)*100)/100}).eq('id',it.id).then(r=>{if(r.error)notify(T('Could not save the price')+': '+r.error.message,true,true);load()})}
-    else openSheet('expense',it.name,it.default_price)});
+  renderQuick();
   const mine=q.filter(r=>!r.op&&r.state!=='conflict'&&r.household_id===hh.id).map(r=>({...r,id:r.client_id,pending:1,profiles:{name:'You'}}));
   $('#tl').innerHTML=[...mine,...txs].slice(0,5).map(t=>trow(t,1)).join('')||(haveData?`<div class="empty"><span class="ei">${svg('history')}</span><b>${T('No transactions yet')}</b><small>${T('Withdraw cash to start.')}</small></div>`:sk+sk);
-  if(!haveData&&!qiAll.length)$('#qi').innerHTML='<div class="sk skt"></div><div class="sk skt"></div>';
   $('#tl').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>askDelete(txs.find(y=>y.id===b.dataset.d)));
   $('#tl').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const x=txs.find(y=>y.id===b.dataset.e);x&&openSheet(x.type,'','',x)});
   netPaint();
