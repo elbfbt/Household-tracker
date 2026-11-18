@@ -437,10 +437,10 @@ console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v15'))return false;const c=await caches.open('ht-v15');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v16'))return false;const c=await caches.open('ht-v16');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
-  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v15');await new Promise(r=>setTimeout(r,200));
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v16');await new Promise(r=>setTimeout(r,200));
     return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
       cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
   eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');
@@ -513,5 +513,62 @@ await test('empty states: quick purchases and Recent explain what to do, Add ite
   ok(await p.has('#qadd'),'Add item is still offered');
   eq(await p.page.evaluate(()=>document.querySelectorAll('#qi .qc:not(.add)').length),0);
   noErr(p);await p.close()});
+
+console.log('\nQuick Purchases render discipline (regression)');
+/* Behavioural instrumentation: count Quick Purchase DOM nodes created/removed around one action, and keep
+   node references to prove the entrance animation (which only runs at node creation) cannot have replayed. */
+/* counts node CREATIONS and DESTRUCTIONS by object identity: re-ordering an existing node is not a re-render */
+const qiWatch=p=>p.page.evaluate(()=>{const el=document.querySelector('#qi');window.__qim={add:0,rem:0,log:[]};window.__qir={};const seen=new WeakSet();
+  el.querySelectorAll('.qc:not(.add)').forEach(n=>{seen.add(n);window.__qir[n.dataset.k||n.dataset.i]=n});
+  new MutationObserver(ms=>ms.forEach(m=>{[...m.addedNodes].forEach(n=>{if(n.nodeType===1&&n.classList.contains('qc')&&!n.classList.contains('add')&&!seen.has(n)){seen.add(n);window.__qim.add++;window.__qim.log.push('+'+(n.dataset.k||'?'))}});
+    [...m.removedNodes].forEach(n=>{if(n.nodeType===1&&n.classList.contains('qc')&&!n.classList.contains('add')&&!n.isConnected){window.__qim.rem++;window.__qim.log.push('-'+(n.dataset.k||'?'))}})})).observe(el,{childList:true})});
+const qiRead=p=>p.page.evaluate(()=>({add:window.__qim.add,rem:window.__qim.rem,log:window.__qim.log.join(' '),
+  keys:[...document.querySelectorAll('#qi .qc:not(.add)')].map(n=>n.dataset.k||n.dataset.i),
+  same:Object.entries(window.__qir).every(([k,n])=>n.isConnected&&(n.dataset.k||n.dataset.i)===k)}));
+const qiSettle=async p=>{await p.status(/Online|متصل/);await sleep(1500)};
+const qiAdd=async(p,name,price,amount)=>{await p.page.click('[data-t="expense"]');await sheetOn(p);
+  await p.page.$eval('#amt',(e,v)=>e.value=v,String(amount));await p.page.$eval('#nt',(e,v)=>e.value=v,name);
+  await p.page.click('#qa');await p.page.$eval('#qp',(e,v)=>e.value=v,String(price));await p.page.click('#sv')};
+
+await test('regression (was: Quick Purchases re-rendered 3x per save): ONE plain expense save never rebuilds the grid — in English AND in Arabic',async()=>{
+  for(const lang of ['en','ar']){
+    const p=await open({uid:M,lang});await p.go();await p.dash();await qiSettle(p);await qiWatch(p);
+    await addExpense(p,7,lang==='ar'?'شاي':'Tea');await qiSettle(p);
+    const r=await qiRead(p);
+    eq([r.add,r.rem],[0,0],lang+': no Quick Purchase node created or removed: '+r.log);
+    ok(r.same,lang+': every item kept its own DOM node (its entrance animation cannot have replayed)');
+    eq(r.keys.length,6,lang+': still the same six items');
+    noErr(p);await p.close()}});
+await test('regression: one save with "Add to Quick Purchases" creates exactly ONE item, once — optimistic and synced states converge without a second render',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await qiSettle(p);await qiWatch(p);
+  await qiAdd(p,'Yogurt',40,45);await qiSettle(p);
+  const r=await qiRead(p);eq(r.add,1,'exactly one node created: '+r.log);eq(r.rem,0,'nothing replaced: '+r.log);
+  const st=await p.page.evaluate(()=>{const n=[...document.querySelectorAll('#qi .qc:not(.add)')].find(x=>/Yogurt/.test(x.textContent));
+    return n?{pend:n.classList.contains('pend'),price:n.querySelector('small').textContent,k:n.dataset.k,inCls:n.classList.contains('in')}:null});
+  ok(st,'the new item is listed');ok(!st.pend,'pending badge removed IN PLACE after sync (same node, no re-animation)');
+  ok(/40/.test(st.price),'its default price is shown: '+st.price);ok(st.inCls,'it entered with the one-time entrance animation');
+  eq((await qiRead(p)).keys.length,7,'seven items now');
+  noErr(p);await p.close()});
+await test('unrelated state changes, edit toggles and repeated identical syncs never rebuild the grid and never replay entrance animations',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await qiSettle(p);await qiWatch(p);
+  await p.page.click('#per');await sleep(150);                       // period chip -> paint() with unchanged quick data
+  await p.page.click('#ed');await p.wait(()=>!!document.querySelector('#qi [data-del]'));await sleep(150);   // edit marks: in-place update
+  await p.page.click('#ed');await sleep(150);
+  await p.net(false);await p.net(true);await qiSettle(p);             // offline/online -> load+flush with identical data
+  const r=await qiRead(p);
+  eq([r.add,r.rem],[0,0],'no nodes created/removed across paints and a re-sync: '+r.log);
+  ok(r.same,'all nodes still the same objects — animations cannot have replayed');
+  const running=await p.page.evaluate(()=>[...document.querySelectorAll('#qi .qc')].reduce((a,n)=>a+n.getAnimations().filter(a=>a.playState==='running').length,0));
+  eq(running,0,'no entrance animation is running');
+  noErr(p);await p.close()});
+await test('a genuinely new quick purchase from the template picker updates the list correctly and leaves the other items untouched',async()=>{
+  const p=await open({uid:M});await p.go();await p.dash();await qiSettle(p);await qiWatch(p);
+  await p.page.$eval('#qadd',e=>e.click());await p.wait(()=>document.querySelector('#qs').classList.contains('on'));
+  await p.page.$eval('#qsl [data-k]:not([disabled])',e=>e.click());await sleep(200);    // prompt auto-accepts the suggested price
+  await p.page.click('#qs [data-x]');await p.wait(()=>!document.querySelector('#qs').classList.contains('on'));await qiSettle(p);
+  const r=await qiRead(p);
+  eq(r.add,1,'exactly one new item: '+r.log);eq(r.rem,0,'the existing items were not replaced: '+r.log);ok(r.same,'existing nodes kept their identity');
+  noErr(p);await p.close()});
+
 }catch(e){console.error(e);process.exitCode=1}
 finally{done('ui');await browser.close();server.close()}
