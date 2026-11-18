@@ -437,10 +437,10 @@ console.log('\nPWA / service worker');
 await test('service worker precaches the shell (incl. supabase lib); the app starts with the server unreachable',async()=>{
   srv.noSW=false;const p=await open({uid:O});await p.go();await p.dash();await p.status(/Online/);
   await p.page.evaluate(()=>navigator.serviceWorker.ready);
-  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v14'))return false;const c=await caches.open('ht-v14');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
+  await p.wait(()=>caches.keys().then(async k=>{if(!k.includes('ht-v15'))return false;const c=await caches.open('ht-v15');return!!(await c.match('supabase.min.js'))&&!!(await c.match('index.html'))&&!!(await c.match('core.js'))}),null,8000);
   await p.wait(()=>!!navigator.serviceWorker.controller,null,8000);
   // the app's worker is still the one controlling the page; the push worker lives in its own scope and is never cached by it
-  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v14');await new Promise(r=>setTimeout(r,200));
+  const sw=await p.page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();const w=await fetch('push/onesignal/OneSignalSDKWorker.js');const c=await caches.open('ht-v15');await new Promise(r=>setTimeout(r,200));
     return{script:new URL(navigator.serviceWorker.controller.scriptURL).pathname,scope:new URL(r.scope).pathname,worker:w.ok&&/importScripts\("https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js"\)/.test(await w.text()),
       cached:(await c.keys()).filter(q=>/onesignal/i.test(q.url)).length,manifest:await (await fetch('manifest.json')).json()}});
   eq([sw.script,sw.scope,sw.worker,sw.cached],['/sw.js','/',true,0]);eq([sw.manifest.display,sw.manifest.start_url,sw.manifest.icons.length],['standalone','./',2],'installability unchanged:');
@@ -489,5 +489,29 @@ await test('an entry recorded NOW but dated two days ago (bank SMS import) is fi
   await p.page.$eval('#nv button[data-n="hist"]',e=>e.click());await p.wait(()=>document.querySelectorAll('#hl .tx').length>=7);
   const h=await p.page.$$eval('#hl .tx',r=>r.map(e=>e.textContent));const at=h.findIndex(x=>/Mansoura Market/.test(x));
   ok(/Tea/.test(h[0]),'History: newest transaction time first');eq(at,h.length-1,'History: the two-day-old purchase is at its chronological place (the oldest), not on top');noErr(p);await p.close()});
+
+console.log('\nDesign system polish');
+await test('design tokens exist and quick-purchase items enter with a 30 ms stagger',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();
+  const r=await p.page.evaluate(()=>{const cs=getComputedStyle(document.documentElement),q=[...document.querySelectorAll('#qi .qc:not(.add)')];
+    return{rLg:cs.getPropertyValue('--r-lg').trim(),sp4:cs.getPropertyValue('--s4').trim(),dur:cs.getPropertyValue('--dur-2').trim(),ring:cs.getPropertyValue('--ring').trim(),
+      anim:q.map(x=>getComputedStyle(x).animationName),del:q.map(x=>parseFloat(getComputedStyle(x).animationDelay))}});
+  eq(r.rLg,'18px','radius family token:');eq(r.sp4,'16px','spacing scale token:');eq(r.dur,'200ms','motion token:');ok(/^rgba\(/.test(r.ring),'ring token: '+r.ring);
+  ok(r.anim.length>=6&&r.anim.every(a=>a==='qcIn'),'items animate in: '+r.anim.join(','));
+  ok(r.del[0]===0&&r.del[1]>=0.029&&r.del[2]>=0.059,'30ms stagger: '+r.del.slice(0,3).join(','));
+  noErr(p);await p.close()});
+await test('prefers-reduced-motion: entrance animations and transitions are switched off',async()=>{
+  const p=await open({uid:O});await p.page.emulateMediaFeatures([{name:'prefers-reduced-motion',value:'reduce'}]);await p.go();await p.dash();
+  const r=await p.page.evaluate(()=>({anim:getComputedStyle(document.querySelector('#qi .qc')).animationName,tr:getComputedStyle(document.querySelector('.btn')).transitionDuration}));
+  eq(r.anim,'none','no entrance animation');ok(r.tr==='0s','transitions off: '+r.tr);noErr(p);await p.close()});
+await test('empty states: quick purchases and Recent explain what to do, Add item is still offered',async()=>{
+  const p=await open({uid:O});await p.go();await p.dash();
+  await p.setDb(d=>{d.quick_items=[];d.transactions=[]});await p.page.reload({waitUntil:'domcontentloaded'});await p.dash();await p.status(/Online/);
+  await p.wait(()=>document.querySelector('#qi .qempty')&&document.querySelector('#tl .empty'));
+  const q=await p.text('#qi'),t=await p.text('#tl');
+  ok(/No quick purchases yet/.test(q)&&/commonly purchased/.test(q),'quick empty: '+q);ok(/No transactions yet/.test(t)&&/Withdraw cash to start/.test(t),'recent empty: '+t);
+  ok(await p.has('#qadd'),'Add item is still offered');
+  eq(await p.page.evaluate(()=>document.querySelectorAll('#qi .qc:not(.add)').length),0);
+  noErr(p);await p.close()});
 }catch(e){console.error(e);process.exitCode=1}
 finally{done('ui');await browser.close();server.close()}
